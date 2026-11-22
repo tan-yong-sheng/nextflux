@@ -308,6 +308,12 @@ export default {
       sync15min: "Her 15 dakikada",
       sync30min: "Her 30 dakikada",
       sync1hour: "Her saat",
+      notifyNewArticles: "Yeni makale bildirimleri",
+      notifyNewArticlesDescription:
+        "Nextflux açıkken bildir. Uygulama kapalıyken bildirim henüz desteklenmiyor.",
+      notifyDenied:
+        "Bildirim izni reddedildi. Tarayıcı veya sistem ayarlarından Nextflux için bildirimlere izin verin.",
+      notifyUnsupported: "Bu tarayıcı bildirimleri desteklemiyor.",
       feeds: "BESLEMELER",
       showHiddenFeeds: "Gizli beslemeleri göster",
       defaultExpandCategory: "Kategorileri varsayılan olarak genişlet",
@@ -406,6 +412,10 @@ export default {
       selectModel: "Model seç",
       prompt: "Prompt",
     },
+  },
+  notifications: {
+    newArticles_one: "{{count}} yeni makale",
+    newArticles_other: "{{count}} yeni makale",
   },
   error: {
     description404: "Sayfa bulunamadı",

@@ -45,6 +45,46 @@ test("worker only handles explicit updates and removes its previous offline cach
   assert.equal(activations, 1);
 });
 
+test("notification click focuses an existing tab or opens the app", async () => {
+  const events = new Map();
+  const scope = "https://nextflux.example/";
+  const clients = {
+    matchAll: async () => [
+      { url: "https://other.example/", focus: async () => "wrong" },
+      { url: "https://nextflux.example/articles/1", focus: async () => "focused" },
+    ],
+    openWindow: async (url) => `opened:${url}`,
+  };
+  runInNewContext(await readFile(new URL("../src/sw.js", import.meta.url), "utf8"), {
+    self: {
+      __WB_MANIFEST: [],
+      registration: { scope },
+      clients,
+      addEventListener: (type, handler) => events.set(type, handler),
+      skipWaiting: () => {},
+    },
+    caches: { keys: async () => [], delete: async () => {} },
+  });
+
+  let result;
+  events.get("notificationclick")({
+    notification: { close: () => {}, data: { url: "/articles/1" } },
+    waitUntil: (promise) => {
+      result = promise;
+    },
+  });
+  assert.equal(await result, "focused");
+
+  clients.matchAll = async () => [];
+  events.get("notificationclick")({
+    notification: { close: () => {}, data: { url: "/" } },
+    waitUntil: (promise) => {
+      result = promise;
+    },
+  });
+  assert.equal(await result, "opened:/");
+});
+
 test("only macOS Chromium selects the compensated manifest", async () => {
   const html = await readFile(
     new URL("../index.html", import.meta.url),

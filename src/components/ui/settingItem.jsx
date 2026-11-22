@@ -109,6 +109,7 @@ export function SwitchItem({
   settingValue,
   disabled = false,
   description,
+  onChange,
 }) {
   return (
     <Field orientation="horizontal" className={rowClass} disabled={disabled}>
@@ -122,9 +123,10 @@ export function SwitchItem({
         aria-label={label}
         checked={settingValue}
         disabled={disabled}
-        onCheckedChange={(checked) =>
-          updateSettings({ [settingName]: checked })
-        }
+        onCheckedChange={(checked) => {
+          if (onChange) onChange(checked);
+          else updateSettings({ [settingName]: checked });
+        }}
       />
     </Field>
   );

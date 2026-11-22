@@ -45,7 +45,7 @@ export async function reconcileFeeds(feeds, categories) {
 }
 
 export async function mergeArticles(articles) {
-  if (!articles.length) return [];
+  if (!articles.length) return { changed: [], added: [] };
   return db.transaction("rw", db.articles, async () => {
     const existing = await db.articles.bulkGet(articles.map(({ id }) => id));
     const existingIds = new Set(existing.filter(Boolean).map(({ id }) => id));
@@ -54,13 +54,15 @@ export async function mergeArticles(articles) {
       (article) => article.status !== "removed" || existingIds.has(article.id),
     );
     const changed = changedRecords(existing.filter(Boolean), relevant);
+    // Rows with no local record are genuinely new; changed also covers updates.
+    const added = relevant.filter(({ id }) => !existingIds.has(id));
     const removedIds = changed
       .filter(({ status }) => status === "removed")
       .map(({ id }) => id);
     const upserts = changed.filter(({ status }) => status !== "removed");
     if (removedIds.length) await db.articles.bulkDelete(removedIds);
     if (upserts.length) await db.articles.bulkPut(upserts);
-    return changed;
+    return { changed, added };
   });
 }
 

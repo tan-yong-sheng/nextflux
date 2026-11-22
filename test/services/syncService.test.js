@@ -18,8 +18,9 @@ function fixture({ entries = [], lastSync = null, cap = Infinity, now } = {}) {
         (article) =>
           JSON.stringify(stored.get(article.id)) !== JSON.stringify(article),
       );
+      const added = changed.filter((article) => !stored.has(article.id));
       changed.forEach((article) => stored.set(article.id, article));
-      return changed;
+      return { changed, added };
     },
     getLastSyncTime: () => lastSync,
     setLastSyncTime: (time) => {

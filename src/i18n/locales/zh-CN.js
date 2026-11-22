@@ -302,6 +302,11 @@ export default {
       sync15min: "每 15 分钟",
       sync30min: "每 30 分钟",
       sync1hour: "每 1 小时",
+      notifyNewArticles: "新文章通知",
+      notifyNewArticlesDescription:
+        "在 Nextflux 打开时发送通知。暂不支持应用关闭后的推送。",
+      notifyDenied: "通知权限已被拒绝，请在浏览器或系统设置中允许 Nextflux 发送通知。",
+      notifyUnsupported: "当前浏览器不支持通知。",
       feeds: "订阅",
       showHiddenFeeds: "显示隐藏订阅",
       defaultExpandCategory: "默认展开分类",
@@ -398,6 +403,9 @@ export default {
       selectModel: "选择模型",
       prompt: "提示词",
     },
+  },
+  notifications: {
+    newArticles_other: "{{count}} 篇新文章",
   },
   error: {
     description404: "页面不存在",
