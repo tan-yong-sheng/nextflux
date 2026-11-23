@@ -44,7 +44,6 @@ const pendingNoticeArticles = persistentAtom(
     decode: (str) => JSON.parse(str),
   },
 );
-const NOTICE_ARTICLE_LIMIT = 200;
 
 function mergeNoticeCandidates(pending, added) {
   const seen = new Set(pending.map(({ id }) => id));
@@ -59,7 +58,9 @@ function mergeNoticeCandidates(pending, added) {
       status: article.status,
     });
   }
-  return next.slice(-NOTICE_ARTICLE_LIMIT);
+  // Keep every candidate: the notice count has to reflect what actually
+  // arrived, and the queue is emptied once the notice is shown.
+  return next;
 }
 
 export function sync() {

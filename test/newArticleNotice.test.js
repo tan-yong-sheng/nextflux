@@ -80,6 +80,10 @@ test("announces only after opted-in incremental sync with permission", () => {
     false,
   );
   assert.equal(
+    notificationRunEnabled({ ...base, permission: "unsupported" }),
+    false,
+  );
+  assert.equal(
     notificationRunEnabled({ ...base, hadPreviousSync: false }),
     false,
   );
