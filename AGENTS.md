@@ -1,8 +1,10 @@
 # AGENTS.md
 
-## This repository is local-only
+## Remotes
 
-This is the user's personal fork/checkout for local use. **Never push to any remote** — do not push commits, create remote branches, open PRs on the upstream repo (`electh/nextflux`), or otherwise modify anything outside this local checkout. Fetch upstream issues/PRs for reference with `gh ... -R electh/nextflux`, but treat this repo as offline.
+- `upstream` → https://github.com/tan-yong-sheng/nextflux (the user's own fork). Pushing there is fine.
+- Never push to the original repo `electh/nextflux`.
+- Fetch its issues/PRs for reference with `gh ... -R electh/nextflux`.
 
 ## Project
 
