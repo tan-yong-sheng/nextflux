@@ -6,8 +6,14 @@ import {
   GitHubClient,
   GitHubError,
   parseRepo,
-  toBase64,
 } from "../../src/api/github/client.js";
+
+function toBase64(text) {
+  const bytes = new TextEncoder().encode(text);
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary);
+}
 
 function jsonResponse(body, { status = 200, ok = status < 400 } = {}) {
   return {
@@ -59,46 +65,6 @@ test("readFile reports a missing path as not found", async () => {
   });
   const file = await client.readFile("o/r", "missing.opml");
   assert.equal(file.found, false);
-});
-
-test("writeFile sends base64 content and the current blob sha", async () => {
-  let request = null;
-  const client = new GitHubClient({
-    token: "t",
-    fetchImpl: async (url, options) => {
-      request = { url, options };
-      return jsonResponse({
-        content: { sha: "new-blob" },
-        commit: { sha: "commit-sha", html_url: "https://github.com/o/r/commit" },
-      });
-    },
-  });
-  const result = await client.writeFile("o/r", "a.opml", "body", {
-    branch: "main",
-    message: "backup: test",
-    sha: "old-blob",
-  });
-  assert.equal(request.options.method, "PUT");
-  assert.equal(request.options.headers.Authorization, "Bearer t");
-  const body = JSON.parse(request.options.body);
-  assert.equal(body.content, toBase64("body"));
-  assert.equal(body.sha, "old-blob");
-  assert.equal(body.branch, "main");
-  assert.equal(body.message, "backup: test");
-  assert.equal(result.commitSha, "commit-sha");
-});
-
-test("writeFile omits the sha when creating a new file", async () => {
-  let body = null;
-  const client = new GitHubClient({
-    token: "t",
-    fetchImpl: async (url, options) => {
-      body = JSON.parse(options.body);
-      return jsonResponse({ content: {}, commit: {} });
-    },
-  });
-  await client.writeFile("o/r", "a.opml", "body", { branch: "main", message: "m" });
-  assert.equal("sha" in body, false);
 });
 
 test("listCommits maps the GitHub payload to the fields the UI needs", async () => {
@@ -156,6 +122,7 @@ test("commitFiles writes every file of the backup in one commit", async () => {
   });
 
   assert.equal(result.commitSha, "new-commit");
+  assert.equal(result.commitUrl, "https://github.com/o/r/commit/new-commit");
   const treeRequest = requests.find((request) => request.url.endsWith("/git/trees"));
   assert.equal(treeRequest.method, "POST");
   const reference = requests.find((request) =>
@@ -195,11 +162,29 @@ test("HTTP failures carry the status code and the GitHub message", async () => {
       jsonResponse({ message: "Bad credentials" }, { status: 401 }),
   });
   await assert.rejects(
-    () => client.writeFile("o/r", "a.opml", "body", { message: "m" }),
+    () => client.readFile("o/r", "a.opml"),
     (error) => {
       assert.equal(error instanceof GitHubError, true);
       assert.equal(error.status, 401);
       assert.equal(error.code, "Bad credentials");
+      return true;
+    },
+  );
+});
+
+test("a network failure is reported as an offline error", async () => {
+  const client = new GitHubClient({
+    token: "t",
+    fetchImpl: async () => {
+      throw new TypeError("Failed to fetch");
+    },
+  });
+  await assert.rejects(
+    () => client.readFile("o/r", "a.opml"),
+    (error) => {
+      assert.equal(error instanceof GitHubError, true);
+      assert.equal(error.status, 0);
+      assert.equal(error.code, "offline");
       return true;
     },
   );

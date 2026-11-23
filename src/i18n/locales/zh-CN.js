@@ -331,6 +331,7 @@ export default {
         missingRepo: "请先填写仓库",
         missingToken: "请先填写访问令牌",
         invalidRepo: "仓库名称格式不正确",
+        offline: "无法连接 GitHub，请重试",
         unknown: "GitHub 请求失败，请重试",
       },
     },

@@ -35,7 +35,8 @@ nextflux/
   `serverUrl + userId` (`src/domain/auth/accounts.js`). Stable, filesystem-safe, and does
   not leak the server URL.
 - `meta.json`: `{ version: 1, host, username, userId, exportedAt, feedCount, app }`.
-  No tokens, no Miniflux credentials.
+  `host` is the hostname of the Miniflux server only, never the full URL. No tokens, no
+  Miniflux credentials.
 
 ## Backup flow
 
@@ -46,8 +47,8 @@ nextflux/
    (`POST /git/trees` → `POST /git/commits` → `PATCH /git/refs/heads/{branch}`), with a
    message such as `backup: example.com user 2026-11-23 (142 feeds)`. The contents API
    creates one commit per file, which would double the history of every backup.
-5. On a failed ref update (422, the branch head moved), build the commit again on top of
-   the current head and retry once; on a second failure, report and stop.
+5. On a failed ref update (409 or 422, the branch head moved), build the commit again on
+   top of the current head and retry once; on a second failure, report and stop.
 
 ## Restore flow
 
@@ -57,7 +58,8 @@ nextflux/
    `outline[xmlUrl]` and its category.
 4. `GET /v1/feeds` → compare URLs.
 5. Preview: `N added`, `M already present`. There are no removals by design.
-6. `POST /v1/import` with the OPML body, then trigger a feed sync.
+6. `POST /v1/import` with the OPML body, then trigger a feed sync. The restore reuses the
+   file and the diff that the preview already read, so it does not fetch them twice.
 
 ## Configuration and multi-account
 
@@ -76,8 +78,10 @@ touches the active account's Miniflux server.
 ## Security
 
 - Use a **fine-grained PAT**: `Contents: Read and write`, `Metadata: Read`, selected repo
-  only. Validate on save with `GET /repos/{owner}/{repo}` and reject tokens without
-  `permissions.push`.
+  only. The access check (`GET /repos/{owner}/{repo}`) runs before a backup and rejects a
+  token without `permissions.push`; the "Back up now" button stays disabled after such a
+  check until the repository or the token changes.
+- The stored token is removed when the account is deleted (`cleanupAccountData`).
 - The token is kept in memory for the session by default. Persisting it to
   `localStorage` is an explicit "remember token" checkbox; the UI names the XSS risk.
 - Never write the token, Miniflux URL, or credentials to the repo. The GitHub

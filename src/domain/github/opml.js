@@ -9,7 +9,7 @@
 const OUTLINE_TAG = /<(\/?)outline\b([^>]*?)(\/?)>/gi;
 const ATTRIBUTE = /([\w:.-]+)\s*=\s*"([^"]*)"/g;
 
-export function parseAttributes(source) {
+function parseAttributes(source) {
   const attributes = {};
   ATTRIBUTE.lastIndex = 0;
   let match;
@@ -91,11 +91,23 @@ export function diffFeeds(opml, existingUrls = []) {
   return { added, present, total: added.length + present.length };
 }
 
+function hostOf(serverUrl) {
+  try {
+    // The hostname without the port: it identifies the server without
+    // exposing a port or credentials.
+    return new URL(serverUrl).hostname;
+  } catch {
+    return "";
+  }
+}
+
 export function buildBackupMeta({ account, exportedAt, feedCount }) {
   return {
     version: 1,
     app: "nextflux",
-    host: account?.serverUrl || "",
+    // Only the hostname is stored: the full URL can carry credentials or a
+    // private host name that does not belong in a repository.
+    host: hostOf(account?.serverUrl),
     username: account?.username || "",
     userId: account?.userId ?? "",
     exportedAt,

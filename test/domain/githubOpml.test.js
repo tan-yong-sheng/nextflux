@@ -86,9 +86,24 @@ test("backup meta carries the account identity but no credentials", () => {
   });
   assert.equal(meta.version, 1);
   assert.equal(meta.app, "nextflux");
-  assert.equal(meta.host, "https://miniflux.example.com");
+  assert.equal(meta.host, "miniflux.example.com");
   assert.equal(meta.username, "alice");
   assert.equal(meta.feedCount, 12);
   assert.equal(JSON.stringify(meta).includes("secret-token"), false);
   assert.equal(JSON.stringify(meta).includes("secret-password"), false);
+});
+
+test("the metadata stores only the host of the Miniflux URL", () => {
+  const meta = buildBackupMeta({
+    account: {
+      serverUrl: "https://alice:secret@miniflux.example.com:8080/feed",
+      username: "alice",
+      userId: 42,
+    },
+    exportedAt: "2026-11-23T00:00:00.000Z",
+    feedCount: 3,
+  });
+  assert.equal(meta.host, "miniflux.example.com");
+  assert.equal(JSON.stringify(meta).includes("secret"), false);
+  assert.equal(JSON.stringify(meta).includes(":8080"), false);
 });

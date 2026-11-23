@@ -83,9 +83,9 @@ export async function backupAccount(account, { config, client, feeds } = {}) {
       files,
     });
   } catch (error) {
-    if (error.status !== 422) throw error;
-    // Someone else committed in the meantime: build the commit again on top
-    // of the current branch head.
+    // 409 and 422 both mean the branch moved while the backup was prepared:
+    // build the commit again on top of the current branch head, once.
+    if (error.status !== 409 && error.status !== 422) throw error;
     result = await github.commitFiles(settings.repo, {
       branch: settings.branch,
       message,
@@ -145,15 +145,20 @@ export async function previewRestore(
 export async function restoreAccount(
   account,
   commitSha,
-  { config, client, feeds } = {},
+  { config, client, feeds, opml: preparedOPML, diff: preparedDiff } = {},
 ) {
   const { importOPMLText = missingFeedApi, refreshAllFeeds = missingFeedApi } =
     feeds || {};
-  const { opml, diff } = await previewRestore(account, commitSha, {
-    config,
-    client,
-    feeds,
-  });
+  // The preview already read the file and diffed it. Reusing that result
+  // avoids a second round-trip to GitHub and to the Miniflux server.
+  const { opml, diff } =
+    preparedOPML && preparedDiff
+      ? { opml: preparedOPML, diff: preparedDiff }
+      : await previewRestore(account, commitSha, {
+          config,
+          client,
+          feeds,
+        });
   if (diff.added.length === 0) {
     return { imported: false, diff };
   }

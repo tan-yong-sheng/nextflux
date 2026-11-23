@@ -1,10 +1,10 @@
 /**
  * GitHub contents API client used by the subscription backup.
  *
- * The client is deliberately small: it only reads and writes one file at a
- * time in a repository, which is all the backup needs. Every call returns a
- * discriminated result instead of throwing on HTTP status, so the UI can map
- * failures to actionable messages.
+ * The client is deliberately small: it only reads files and commits files in
+ * a repository, which is all the backup needs. HTTP failures are thrown as
+ * `GitHubError` with the status and the GitHub message attached, so the UI
+ * can map them to actionable messages.
  */
 
 const API_ROOT = "https://api.github.com";
@@ -41,13 +41,6 @@ export function parseRepo(repo) {
   return { owner, name, fullName: `${owner}/${name}` };
 }
 
-export function toBase64(text) {
-  const bytes = new TextEncoder().encode(text);
-  let binary = "";
-  for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary);
-}
-
 export function fromBase64(encoded) {
   const binary = atob(encoded);
   const bytes = new Uint8Array(binary.length);
@@ -76,10 +69,17 @@ export class GitHubClient {
   }
 
   async request(url, options = {}) {
-    const response = await this.fetch(url, {
-      ...options,
-      headers: this.headers(options.headers),
-    });
+    let response;
+    try {
+      response = await this.fetch(url, {
+        ...options,
+        headers: this.headers(options.headers),
+      });
+    } catch (error) {
+      // A network failure carries no status, so the UI cannot tell it apart
+      // from an HTTP error without this marker.
+      throw new GitHubError(0, "offline", error?.message);
+    }
 
     if (!response.ok) {
       const body = await response.json().catch(() => null);
@@ -137,35 +137,6 @@ export class GitHubClient {
       if (error.status === 404) return { found: false };
       throw error;
     }
-  }
-
-  /**
-   * Write a file, creating or updating it. Returns the new commit URL.
-   */
-  async writeFile(repo, path, content, { branch, message, sha } = {}) {
-    const parsed = parseRepo(repo);
-    if (!parsed) throw new GitHubError(0, "invalidRepo");
-    const body = {
-      message,
-      content: toBase64(content),
-      branch,
-    };
-    if (sha) body.sha = sha;
-
-    const response = await this.request(
-      `${API_ROOT}/repos/${encodePath(parsed.fullName)}/contents/${encodePath(path)}`,
-      {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      },
-    );
-    const result = await response.json();
-    return {
-      sha: result.content?.sha,
-      commitSha: result.commit?.sha,
-      commitUrl: result.commit?.html_url,
-    };
   }
 
   /**
@@ -234,7 +205,10 @@ export class GitHubClient {
     return {
       sha: treeResult.sha,
       commitSha: commitResult.sha,
-      commitUrl: referenceResult.object?.url || null,
+      // The reference API answers with an API URL, so the web URL is built
+      // from the repository name to give the UI a link a human can open.
+      commitUrl: `https://github.com/${parsed.fullName}/commit/${commitResult.sha}`,
+      referenceUrl: referenceResult.object?.url || null,
     };
   }
 

@@ -345,6 +345,7 @@ export default {
         missingRepo: "Saisissez d'abord un dépôt",
         missingToken: "Saisissez d'abord un jeton d'accès",
         invalidRepo: "Le nom du dépôt n'est pas valide",
+        offline: "Impossible de joindre GitHub, veuillez réessayer",
         unknown: "La requête GitHub a échoué, veuillez réessayer",
       },
     },

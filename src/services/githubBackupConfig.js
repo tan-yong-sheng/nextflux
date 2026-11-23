@@ -69,11 +69,6 @@ export function saveBackupConfig(account, changes) {
   return { ...next, token: sessionTokens.get(account?.id) || "" };
 }
 
-export function setSessionToken(account, token) {
-  if (token) sessionTokens.set(account?.id, token);
-  else sessionTokens.delete(account?.id);
-}
-
 export function clearBackupConfig(account) {
   sessionTokens.delete(account?.id);
   try {

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { CloudUpload, History, ShieldCheck } from "lucide-react";
+import { formatDate } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { Input } from "@/components/ui/input";
@@ -19,7 +20,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { GitHubClient } from "@/api/github/client.js";
+import { GitHubClient, GitHubError } from "@/api/github/client.js";
 import {
   backupAccount,
   listBackupVersions,
@@ -33,34 +34,10 @@ import {
 import { exportOPML, getFeeds, importOPMLText, refreshAllFeeds } from "@/api/resources/feeds.js";
 import { authState } from "@/stores/authStore.js";
 import { reportError } from "@/lib/errors";
+import { githubErrorKey } from "@/domain/github/errorKeys.js";
 import { useStore } from "@nanostores/react";
 
 const key = (name) => `settings.backup.github.${name}`;
-
-function formatError(error) {
-  switch (error?.status) {
-    case 401:
-      return "unauthorized";
-    case 403:
-      return "forbidden";
-    case 404:
-      return "notFound";
-    case 409:
-      return "conflict";
-    default:
-      break;
-  }
-  switch (error?.code) {
-    case "missingRepo":
-      return "missingRepo";
-    case "missingToken":
-      return "missingToken";
-    case "invalidRepo":
-      return "invalidRepo";
-    default:
-      return "unknown";
-  }
-}
 
 export default function GitHubBackup() {
   const { t } = useTranslation();
@@ -70,11 +47,13 @@ export default function GitHubBackup() {
   const [busy, setBusy] = useState(null);
   const [versions, setVersions] = useState(null);
   const [preview, setPreview] = useState(null);
+  const [canWrite, setCanWrite] = useState(null);
 
   useEffect(() => {
     setConfig(getBackupConfig(account));
     setVersions(null);
     setPreview(null);
+    setCanWrite(null);
     // The configuration is per account, so a new account reloads it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accountId]);
@@ -82,6 +61,8 @@ export default function GitHubBackup() {
   const update = (changes) => {
     const next = saveBackupConfig(account, changes);
     setConfig(next);
+    // A different repository or token needs a new access check.
+    if ("repo" in changes || "token" in changes) setCanWrite(null);
     return next;
   };
 
@@ -97,85 +78,80 @@ export default function GitHubBackup() {
     refreshAllFeeds,
   };
 
-  const testAccess = async () => {
-    setBusy("test");
+  const run = async (busyKey, context, action) => {
+    setBusy(busyKey);
     try {
-      const client = new GitHubClient({ token: config.token });
-      const result = await client.testAccess(config.repo);
-      if (!result.ok) {
-        if (result.status === 401) throw Object.assign(new Error(""), { status: 401 });
-        if (result.status === 404) throw Object.assign(new Error(""), { status: 404 });
-        throw Object.assign(new Error(""), { status: result.status || 0 });
-      }
-      if (result.permissions && !result.permissions.push) {
-        toast.error(t(key("noWriteAccess")));
-        return;
-      }
-      toast.success(t(key("testSuccess")));
+      await action();
     } catch (error) {
-      reportError(error, "backup.github.test");
-      toast.error(t(key(formatError(error))));
+      reportError(error, context);
+      toast.error(t(key(githubErrorKey(error))));
     } finally {
       setBusy(null);
     }
   };
 
-  const runBackup = async () => {
-    setBusy("backup");
-    try {
+  const testAccess = () =>
+    run("test", "backup.github.test", async () => {
+      const client = new GitHubClient({ token: config.token });
+      const result = await client.testAccess(config.repo);
+      if (!result.ok) {
+        throw result.error || new GitHubError(result.status || 0, "requestFailed");
+      }
+      if (result.permissions && !result.permissions.push) {
+        setCanWrite(false);
+        toast.error(t(key("noWriteAccess")));
+        return;
+      }
+      setCanWrite(true);
+      toast.success(t(key("testSuccess")));
+    });
+
+  const runBackup = () =>
+    run("backup", "backup.github.backup", async () => {
+      // The write permission is checked here as well, so a token that lost
+      // its access fails with a clear message instead of a 403 later.
+      const client = new GitHubClient({ token: config.token });
+      const access = await client.testAccess(config.repo);
+      if (!access.ok) {
+        throw access.error || new GitHubError(access.status || 0, "requestFailed");
+      }
+      if (access.permissions && !access.permissions.push) {
+        setCanWrite(false);
+        toast.error(t(key("noWriteAccess")));
+        return;
+      }
+      setCanWrite(true);
+
       const result = await backupAccount(account, { config, feeds: feedApi });
       if (result.skipped) {
         toast.success(t(key("unchanged")));
         return;
       }
       toast.success(t(key("backupSuccess"), { count: result.feedCount }));
-      if (result.commitSha) {
-        window.open(
-          `https://github.com/${config.repo}/commit/${result.commitSha}`,
-          "_blank",
-          "noopener",
-        );
+      if (result.commitUrl) {
+        window.open(result.commitUrl, "_blank", "noopener");
       }
-    } catch (error) {
-      reportError(error, "backup.github.backup");
-      toast.error(t(key(formatError(error))));
-    } finally {
-      setBusy(null);
-    }
-  };
+    });
 
-  const openVersions = async () => {
-    setBusy("versions");
-    try {
+  const openVersions = () =>
+    run("versions", "backup.github.versions", async () => {
       const commits = await listBackupVersions(account, { config });
       setVersions(commits);
-    } catch (error) {
-      reportError(error, "backup.github.versions");
-      toast.error(t(key(formatError(error))));
-    } finally {
-      setBusy(null);
-    }
-  };
+    });
 
-  const selectVersion = async (sha) => {
-    setBusy("preview");
-    try {
+  const selectVersion = (sha) =>
+    run("preview", "backup.github.preview", async () => {
       const result = await previewRestore(account, sha, { config, feeds: feedApi });
       setPreview(result);
-    } catch (error) {
-      reportError(error, "backup.github.preview");
-      toast.error(t(key(formatError(error))));
-    } finally {
-      setBusy(null);
-    }
-  };
+    });
 
-  const runRestore = async () => {
-    setBusy("restore");
-    try {
+  const runRestore = () =>
+    run("restore", "backup.github.restore", async () => {
       const result = await restoreAccount(account, preview.commitSha, {
         config,
         feeds: feedApi,
+        opml: preview.opml,
+        diff: preview.diff,
       });
       toast.success(
         t(key(result.imported ? "restoreSuccess" : "restoreNothing"), {
@@ -184,15 +160,11 @@ export default function GitHubBackup() {
       );
       setPreview(null);
       setVersions(null);
-    } catch (error) {
-      reportError(error, "backup.github.restore");
-      toast.error(t(key(formatError(error))));
-    } finally {
-      setBusy(null);
-    }
-  };
+    });
 
   const disabled = !repoValid || !config.token || !!busy;
+  // A token without write access cannot create a backup commit.
+  const backupDisabled = disabled || canWrite === false;
 
   return (
     <>
@@ -288,7 +260,7 @@ export default function GitHubBackup() {
             variant="secondary"
             size="sm"
             onClick={runBackup}
-            disabled={disabled}
+            disabled={backupDisabled}
             aria-busy={busy === "backup"}
           >
             {busy === "backup" ? (
@@ -359,7 +331,7 @@ export default function GitHubBackup() {
                   >
                     <span className="block truncate">{commit.message}</span>
                     <span className="block text-xs text-muted-foreground">
-                      {commit.date}
+                      {formatDate(commit.date)}
                     </span>
                   </button>
                 </li>

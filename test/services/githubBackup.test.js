@@ -42,10 +42,6 @@ function makeClient(overrides = {}) {
         commitUrl: "https://github.com/o/r/commit",
       };
     },
-    writeFile: async (repo, path, content, options) => {
-      calls.push({ method: "writeFile", repo, path, content, options });
-      return { commitSha: "commit-sha", commitUrl: "https://github.com/o/r/commit" };
-    },
     listCommits: async (repo, path, options) => {
       calls.push({ method: "listCommits", repo, path, options });
       return overrides.commits ?? [];
@@ -94,26 +90,28 @@ test("backup skips the commit when the content is unchanged", async () => {
 });
 
 test("backup retries once when the branch head moved", async () => {
-  let commits = 0;
-  const client = {
-    readFile: async () => ({ found: true, sha: "old" }),
-    commitFiles: async () => {
-      commits += 1;
-      if (commits === 1) {
-        const error = new Error("conflict");
-        error.status = 422;
-        throw error;
-      }
-      return { commitSha: "c" };
-    },
-    listCommits: async () => [],
-  };
-  await backupAccount(ACCOUNT, {
-    config: CONFIG,
-    client,
-    feeds: { exportOPML: async () => OPML },
-  });
-  assert.equal(commits, 2);
+  for (const status of [409, 422]) {
+    let commits = 0;
+    const client = {
+      readFile: async () => ({ found: true, sha: "old" }),
+      commitFiles: async () => {
+        commits += 1;
+        if (commits === 1) {
+          const error = new Error("conflict");
+          error.status = status;
+          throw error;
+        }
+        return { commitSha: "c" };
+      },
+      listCommits: async () => [],
+    };
+    await backupAccount(ACCOUNT, {
+      config: CONFIG,
+      client,
+      feeds: { exportOPML: async () => OPML },
+    });
+    assert.equal(commits, 2);
+  }
 });
 
 test("backup fails without a repository or token", async () => {

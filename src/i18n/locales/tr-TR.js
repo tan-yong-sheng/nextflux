@@ -340,6 +340,7 @@ export default {
         missingRepo: "Önce bir depo girin",
         missingToken: "Önce bir erişim belirteci girin",
         invalidRepo: "Depo adı geçerli değil",
+        offline: "GitHub'e bağlanılamadı, lütfen tekrar deneyin",
         unknown: "GitHub isteği başarısız oldu, lütfen tekrar deneyin",
       },
     },

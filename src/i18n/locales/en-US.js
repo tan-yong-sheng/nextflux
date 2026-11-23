@@ -342,6 +342,7 @@ export default {
         missingRepo: "Enter a repository first",
         missingToken: "Enter an access token first",
         invalidRepo: "The repository name is not valid",
+        offline: "No connection to GitHub, please try again",
         unknown: "The GitHub request failed, please try again",
       },
     },
