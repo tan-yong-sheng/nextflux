@@ -56,7 +56,10 @@ export default function PrototypePage() {
 
         {/* Demo feeds have fake ids — pointer-events-none keeps demo clicks
             (mark read, unsubscribe, cards) away from real account actions. */}
-        <div className="pointer-events-none mt-6 rounded-xl border border-border/60 bg-card/30 p-4">
+        <div
+          inert
+          className="pointer-events-none mt-6 rounded-xl border border-border/60 bg-card/30 p-4"
+        >
           {view === "A" && (
             <div className="max-w-[320px] rounded-lg border border-border/60 bg-sidebar p-2">
               <p className="px-2 pb-2 text-[11px] uppercase tracking-wide text-muted-foreground">
@@ -67,7 +70,12 @@ export default function PrototypePage() {
           )}
           {view === "B" && (
             <div className="max-w-[560px]">
-              <ForYouView insights={insights} articles={DEMO_ARTICLES} />
+              <ForYouView
+                insights={insights}
+                articles={DEMO_ARTICLES}
+                feeds={DEMO_FEEDS}
+                demo
+              />
             </div>
           )}
           {view === "C" && <PersonalizedView insights={insights} />}

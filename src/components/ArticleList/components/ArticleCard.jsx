@@ -26,7 +26,7 @@ import { settingsState } from "@/stores/settingsStore";
 import { feeds } from "@/stores/feedsStore";
 import FeedIcon from "@/components/ui/FeedIcon.jsx";
 import { useTranslation } from "react-i18next";
-export default function ArticleCard({ article }) {
+export default function ArticleCard({ article, disableRangeActions = false }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { articleId } = useParams();
@@ -215,14 +215,16 @@ export default function ArticleCard({ article }) {
 
         <ContextMenuContent>
           <ContextMenuGroup>
-            <ContextMenuItem
-              onClick={() => {
-                handleMarkAboveAsRead(article.id);
-              }}
-            >
-              {<ArrowUpFromLine className="size-4 text-muted-foreground" />}
-              {t("common.markAboveAsRead")}
-            </ContextMenuItem>
+            {!disableRangeActions && (
+              <ContextMenuItem
+                onClick={() => {
+                  handleMarkAboveAsRead(article.id);
+                }}
+              >
+                {<ArrowUpFromLine className="size-4 text-muted-foreground" />}
+                {t("common.markAboveAsRead")}
+              </ContextMenuItem>
+            )}
             <ContextMenuItem
               onClick={() => {
                 handleMarkStatus(article);

@@ -47,9 +47,10 @@ export function rankForYou(articles, insights) {
           reasons.push(word);
         }
       }
-      const feedBoost = feedAffinity.get(article.feedId) || 0;
-      if (feedBoost > 0) {
-        score += feedBoost * 3;
+      const feedBoost = feedAffinity.get(article.feedId);
+      if (feedBoost !== undefined) {
+        // Feeds you read often surface even with no starred-title overlap.
+        score += Math.max(feedBoost * 3, 0.5);
         reasons.push("from a feed you read often");
       }
       return {

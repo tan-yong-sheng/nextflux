@@ -14,8 +14,11 @@ export function usePrototypeVariant() {
   const [params, setParams] = useSearchParams();
   const raw = params.get("variant");
   // No variant means "off" — the prototype must never appear by accident,
-  // including in production builds.
-  const variant = PROTOTYPE_VARIANTS.some((v) => v.key === raw) ? raw : null;
+  // including in production builds, where ?variant= is ignored entirely.
+  const variant =
+    !import.meta.env.PROD && PROTOTYPE_VARIANTS.some((v) => v.key === raw)
+      ? raw
+      : null;
   const setVariant = useCallback(
     (next) => {
       const updated = new URLSearchParams(params);

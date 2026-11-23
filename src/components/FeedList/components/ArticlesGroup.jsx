@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/sidebar.jsx";
 import { Link, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import { usePrototypeVariant } from "@/components/Prototype/PrototypeSwitcher.jsx";
 const ArticlesGroup = () => {
   const { t } = useTranslation();
   const $filter = useStore(filter);
@@ -20,6 +21,10 @@ const ArticlesGroup = () => {
   const $totalStarredCount = useStore(totalStarredCount);
   const { isMobile, setOpenMobile } = useSidebar();
   const { feedId, categoryId } = useParams();
+  // PROTOTYPE: variants B/C replace the article list, so the All/Unread/
+  // Starred nav would be a dead control — hide it while they are active.
+  const { variant } = usePrototypeVariant();
+  if (variant === "B" || variant === "C") return null;
   // 根据筛选条件获取显示文本和计数
   const getDisplayInfo = () => {
     switch ($filter) {
