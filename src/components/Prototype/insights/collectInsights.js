@@ -82,6 +82,12 @@ export function collectInsights({ feeds = [], articles = [], now = Date.now() })
     .sort((a, b) => b.starred - a.starred)
     .slice(0, 8);
 
+  // Ranking uses every term count; the display list below is capped for the UI.
+  const topicTerms = [...topicCounts.entries()].map(([term, count]) => ({
+    term,
+    count,
+  }));
+
   const topics = [...topicCounts.entries()]
     .filter(([, count]) => count > 1)
     .sort((a, b) => b[1] - a[1])
@@ -110,6 +116,7 @@ export function collectInsights({ feeds = [], articles = [], now = Date.now() })
     broken,
     topStarredFeeds,
     coreFeeds,
+    topicTerms,
     topics,
   };
 }

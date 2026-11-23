@@ -44,6 +44,9 @@ export function useFeedInsights() {
         title: feed.title,
         unread: entry?.unread || 0,
         starred: entry?.starred || 0,
+        // No article rows at all is not "quiet" — never suggest a feed that
+        // was just added and has not synced anything yet.
+        hasArticles: Boolean(entry),
         daysIdle: last ? Math.floor((now - last) / DAY) : null,
         parsingErrorCount: feed.parsing_error_count || 0,
       };
@@ -52,7 +55,10 @@ export function useFeedInsights() {
     // Quiet is quiet whether or not unread piled up — the whole point is to
     // spot feeds the user can drop.
     const lowActivity = signals
-      .filter((s) => s.daysIdle === null || s.daysIdle >= QUIET_DAYS)
+      .filter(
+        (s) =>
+          s.hasArticles && (s.daysIdle === null || s.daysIdle >= QUIET_DAYS),
+      )
       .sort(
         (a, b) => (b.daysIdle ?? Infinity) - (a.daysIdle ?? Infinity),
       );

@@ -65,14 +65,16 @@ export default function SidebarCleanup({ insights, demo = false }) {
             {/* Demo mode (/prototype) gets fake feed ids — no real actions. */}
             {!demo && (
               <>
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  title="Mark all read"
-                  onClick={() => handleMarkAllRead("feed", feed.id)}
-                >
-                  <Inbox className="size-3.5" />
-                </Button>
+                {feed.unread > 0 && (
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    title="Mark all read"
+                    onClick={() => handleMarkAllRead("feed", feed.id)}
+                  >
+                    <Inbox className="size-3.5" />
+                  </Button>
+                )}
                 <Button
                   variant="ghost"
                   size="icon-sm"

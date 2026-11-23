@@ -81,8 +81,9 @@ export function PrototypeSwitcher({ current, onChange }) {
   if (import.meta.env.PROD) return null;
 
   return (
-    // Cleared of the footer filter tabs, which sit in the same spot.
-    <div className="fixed bottom-20 left-1/2 z-50 -translate-x-1/2">
+    // Cleared of the footer filter tabs and the floating audio dock, which
+    // both sit near the bottom center (audio pill tops out around 7.5rem).
+    <div className="fixed bottom-32 left-1/2 z-50 -translate-x-1/2">
       <div className="flex items-center gap-1 rounded-full border border-white/20 bg-neutral-900/95 px-2 py-1 text-neutral-100 shadow-2xl">
         <button
           type="button"

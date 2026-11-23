@@ -9,8 +9,13 @@ import { toMs, tokenize } from "./signals.js";
  * @returns {Array} unread articles, best first, each with `reasons`
  */
 export function rankForYou(articles, insights) {
+  // `topics` is the capped display list; rank against the uncapped counts so
+  // every starred title term weighs in.
   const topics = new Map(
-    (insights.topics || []).map(({ term, count }) => [term, count]),
+    (insights.topicTerms || insights.topics || []).map(({ term, count }) => [
+      term,
+      count,
+    ]),
   );
   // "Reads a lot of it" is a read-count signal, not a star rate: a feed you
   // read every day but rarely star should still rank up.
