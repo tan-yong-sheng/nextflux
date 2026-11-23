@@ -1,67 +1,73 @@
-// PROTOTYPE — throwaway. Lightweight per-feed activity signals computed from
-// Dexie without loading every article body.
+// PROTOTYPE — throwaway. Per-feed activity signals from Dexie. Only mounted
+// while variant A is active, so the article scan never runs otherwise.
 import { useLiveQuery } from "dexie-react-hooks";
+import { useStore } from "@nanostores/react";
 import { db } from "@/db/database.js";
+import { settingsState } from "@/stores/settingsStore.js";
 
 const IDLE_DAYS = 21;
 const BACKLOG = 25;
+const DAY = 86400000;
+
+// Dexie stores published_at/created_at as Miniflux's RFC3339 strings; demo
+// data uses epoch ms. Normalize both to ms.
+const toMs = (value) => {
+  if (typeof value === "number") return value;
+  const parsed = Date.parse(value);
+  return Number.isNaN(parsed) ? 0 : parsed;
+};
 
 export function useFeedInsights() {
+  const { showHiddenFeeds } = useStore(settingsState);
   const result = useLiveQuery(async () => {
-    const feeds = await db.feeds.toArray();
-    const unread = await db.articles.where("status").equals("unread").toArray();
-    const starred = await db.articles.where("starred").equals(1).toArray();
+    const [feeds, articles] = await Promise.all([
+      db.feeds.toArray(),
+      db.articles.toArray(),
+    ]);
+    const visible = showHiddenFeeds
+      ? feeds
+      : feeds.filter((feed) => !feed.hide_globally);
+    const visibleIds = new Set(visible.map((feed) => feed.id));
 
-    const unreadByFeed = new Map();
-    for (const a of unread) {
-      unreadByFeed.set(a.feedId, (unreadByFeed.get(a.feedId) || 0) + 1);
-    }
-    const starredByFeed = new Map();
-    for (const a of starred) {
-      starredByFeed.set(a.feedId, (starredByFeed.get(a.feedId) || 0) + 1);
-    }
-    const lastActivity = new Map();
-    for (const a of unread.concat(starred)) {
-      const ts = a.published_at || a.created_at;
-      if (!ts) continue;
-      const prev = lastActivity.get(a.feedId);
-      if (!prev || ts > prev) lastActivity.set(a.feedId, ts);
+    // One pass over every article: unread/starred counts plus the latest
+    // published_at of ANY status — a feed whose new items are already read
+    // is not "quiet".
+    const stats = new Map();
+    for (const article of articles) {
+      if (!visibleIds.has(article.feedId)) continue;
+      let entry = stats.get(article.feedId);
+      if (!entry) {
+        entry = { unread: 0, starred: 0, lastActivity: 0 };
+        stats.set(article.feedId, entry);
+      }
+      if (article.status === "unread") entry.unread += 1;
+      if (article.starred === 1) entry.starred += 1;
+      const ts = toMs(article.published_at) || toMs(article.created_at);
+      if (ts > entry.lastActivity) entry.lastActivity = ts;
     }
 
     const now = Date.now();
-    const byId = new Map(feeds.map((f) => [f.id, f]));
-    const signals = [];
-    for (const [feedId, count] of unreadByFeed) {
-      const feed = byId.get(feedId);
-      if (!feed) continue;
-      const last = lastActivity.get(feedId);
-      const daysIdle = last
-        ? Math.floor((now - new Date(last).getTime()) / 86400000)
-        : null;
-      signals.push({
-        id: feedId,
-        title: feed.title,
-        unread: count,
-        starred: starredByFeed.get(feedId) || 0,
-        daysIdle,
-        parsingErrorCount: feed.parsing_error_count || 0,
-      });
-    }
-    for (const feed of feeds) {
-      if (unreadByFeed.has(feed.id)) continue;
-      signals.push({
+    const signals = visible.map((feed) => {
+      const entry = stats.get(feed.id);
+      const last = entry?.lastActivity || 0;
+      return {
         id: feed.id,
         title: feed.title,
-        unread: 0,
-        starred: starredByFeed.get(feed.id) || 0,
-        daysIdle: null,
+        unread: entry?.unread || 0,
+        starred: entry?.starred || 0,
+        daysIdle: last ? Math.floor((now - last) / DAY) : null,
         parsingErrorCount: feed.parsing_error_count || 0,
-      });
-    }
+      };
+    });
 
     const lowActivity = signals
-      .filter((s) => s.daysIdle === null || s.daysIdle >= IDLE_DAYS)
-      .sort((a, b) => b.unread - a.unread);
+      .filter(
+        (s) =>
+          s.unread > 0 && (s.daysIdle === null || s.daysIdle >= IDLE_DAYS),
+      )
+      .sort(
+        (a, b) => (b.daysIdle ?? Infinity) - (a.daysIdle ?? Infinity),
+      );
     const backlog = signals
       .filter((s) => s.unread >= BACKLOG)
       .sort((a, b) => b.unread - a.unread);
@@ -70,10 +76,7 @@ export function useFeedInsights() {
       .sort((a, b) => b.parsingErrorCount - a.parsingErrorCount);
 
     return { signals, lowActivity, backlog, broken };
-  }, []);
+  }, [showHiddenFeeds]);
 
-  return {
-    loading: result === undefined,
-    insights: result || { signals: [], lowActivity: [], backlog: [], broken: [] },
-  };
+  return { loading: result === undefined, insights: result ?? null };
 }

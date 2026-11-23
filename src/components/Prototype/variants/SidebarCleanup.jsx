@@ -15,16 +15,21 @@ const REASON = {
   backlog: (s) => `${s.unread} unread piling up`,
 };
 
-export default function SidebarCleanup({ insights }) {
+export default function SidebarCleanup({ insights, demo = false }) {
+  // A feed can qualify as both "quiet" and "backlog" — list it once.
   const candidates = [
-    ...insights.lowActivity
-      .filter((s) => s.unread > 0)
-      .slice(0, 5)
-      .map((s) => ({ feed: s, reason: REASON.idle(s) })),
-    ...insights.backlog.slice(0, 3).map((s) => ({
-      feed: s,
-      reason: REASON.backlog(s),
-    })),
+    ...new Map(
+      [
+        ...insights.lowActivity
+          .filter((s) => s.unread > 0)
+          .slice(0, 5)
+          .map((s) => ({ feed: s, reason: REASON.idle(s) })),
+        ...insights.backlog.slice(0, 3).map((s) => ({
+          feed: s,
+          reason: REASON.backlog(s),
+        })),
+      ].map((candidate) => [candidate.feed.id, candidate]),
+    ).values(),
   ].slice(0, 6);
 
   if (!candidates.length) return null;
@@ -55,25 +60,30 @@ export default function SidebarCleanup({ insights }) {
                 {reason}
               </span>
             </Link>
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              title="Mark all read"
-              onClick={() => handleMarkAllRead("feed", feed.id)}
-            >
-              <Inbox className="size-3.5" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              title="Unsubscribe"
-              onClick={() => {
-                currentFeedId.set(feed.id.toString());
-                unsubscribeModalOpen.set(true);
-              }}
-            >
-              <Trash2 className="size-3.5" />
-            </Button>
+            {/* Demo mode (/prototype) gets fake feed ids — no real actions. */}
+            {!demo && (
+              <>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  title="Mark all read"
+                  onClick={() => handleMarkAllRead("feed", feed.id)}
+                >
+                  <Inbox className="size-3.5" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  title="Unsubscribe"
+                  onClick={() => {
+                    currentFeedId.set(feed.id.toString());
+                    unsubscribeModalOpen.set(true);
+                  }}
+                >
+                  <Trash2 className="size-3.5" />
+                </Button>
+              </>
+            )}
           </li>
         ))}
       </ul>

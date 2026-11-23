@@ -4,8 +4,23 @@ import { useMemo } from "react";
 import { Sparkles } from "lucide-react";
 import { rankForYou } from "../insights/rankArticles.js";
 import ArticleCard from "@/components/ArticleList/components/ArticleCard.jsx";
+import { usePersonalizationData } from "../usePersonalizationData.js";
 
-export default function ForYouPanel({ insights, articles }) {
+// Container: owns the Dexie read, so it only mounts while variant B is on.
+export default function ForYouPanel() {
+  const { loading, insights, articles } = usePersonalizationData();
+  if (loading || !insights) {
+    return (
+      <div className="min-h-0 flex-1 overflow-y-auto px-6 py-16 text-center text-sm text-muted-foreground">
+        Loading your signals…
+      </div>
+    );
+  }
+  return <ForYouView insights={insights} articles={articles} />;
+}
+
+// Presentational half — reused by /prototype with demo data.
+export function ForYouView({ insights, articles }) {
   const ranked = useMemo(
     () => rankForYou(articles, insights).slice(0, 30),
     [articles, insights],
@@ -13,14 +28,14 @@ export default function ForYouPanel({ insights, articles }) {
 
   if (!ranked.length) {
     return (
-      <div className="px-6 py-16 text-center text-sm text-muted-foreground">
+      <div className="min-h-0 flex-1 overflow-y-auto px-6 py-16 text-center text-sm text-muted-foreground">
         Nothing to recommend yet — star a few articles and this fills up.
       </div>
     );
   }
 
   return (
-    <div className="mx-auto w-full max-w-[560px] px-2">
+    <div className="mx-auto min-h-0 w-full max-w-[560px] flex-1 overflow-y-auto px-2">
       <div className="flex items-center gap-2 px-2 py-3 text-xs text-muted-foreground">
         <Sparkles className="size-3.5" />
         Ranked from {insights.totals.starred} starred articles and the feeds

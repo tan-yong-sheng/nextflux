@@ -10,6 +10,14 @@ const STOP_WORDS = new Set([
 
 const DAY = 24 * 60 * 60 * 1000;
 
+// Dexie stores published_at/created_at as Miniflux's RFC3339 strings; demo
+// data uses epoch ms. Normalize both to ms — Math.max on a string yields NaN.
+const toMs = (value) => {
+  if (typeof value === "number") return value;
+  const parsed = Date.parse(value);
+  return Number.isNaN(parsed) ? 0 : parsed;
+};
+
 const tokenize = (text) =>
   (text || "")
     .toLowerCase()
@@ -33,7 +41,6 @@ export function collectInsights({ feeds = [], articles = [], now = Date.now() })
       starred: 0,
       total: 0,
       lastPublished: 0,
-      lastRead: 0,
     });
   }
 
@@ -52,7 +59,6 @@ export function collectInsights({ feeds = [], articles = [], now = Date.now() })
     } else {
       stats.read += 1;
       totalRead += 1;
-      stats.lastRead = Math.max(stats.lastRead, article.published_at || 0);
     }
     if (article.starred === 1) {
       stats.starred += 1;
@@ -63,7 +69,7 @@ export function collectInsights({ feeds = [], articles = [], now = Date.now() })
     }
     stats.lastPublished = Math.max(
       stats.lastPublished,
-      article.published_at || article.created_at || 0,
+      toMs(article.published_at) || toMs(article.created_at),
     );
   }
 

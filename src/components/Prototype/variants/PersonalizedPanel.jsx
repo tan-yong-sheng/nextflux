@@ -5,12 +5,27 @@ import { Search, Sparkles, TriangleAlert, Moon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import FeedIcon from "@/components/ui/FeedIcon.jsx";
 import { searchDialogOpen } from "@/stores/modalStore.js";
+import { usePersonalizationData } from "../usePersonalizationData.js";
 
-export default function PersonalizedPanel({ insights }) {
+// Container: owns the Dexie read, so it only mounts while variant C is on.
+export default function PersonalizedPanel() {
+  const { loading, insights } = usePersonalizationData();
+  if (loading || !insights) {
+    return (
+      <div className="min-h-0 flex-1 overflow-y-auto px-6 py-16 text-center text-sm text-muted-foreground">
+        Loading your signals…
+      </div>
+    );
+  }
+  return <PersonalizedView insights={insights} />;
+}
+
+// Presentational half — reused by /prototype with demo data.
+export function PersonalizedView({ insights }) {
   const { topics, lowActivity, broken, topStarredFeeds } = insights;
 
   return (
-    <div className="mx-auto w-full max-w-[720px] space-y-6 px-4 py-6">
+    <div className="mx-auto min-h-0 w-full max-w-[720px] flex-1 space-y-6 overflow-y-auto px-4 py-6">
       <section className="rounded-xl border border-border/60 bg-card/40 p-4">
         <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold">
           <Sparkles className="size-4" /> Your reading, summarised
@@ -111,29 +126,28 @@ export default function PersonalizedPanel({ insights }) {
         </Button>
       </section>
 
-      {topStarredFeeds.length > 0 && (
-        <section className="rounded-xl border border-border/60 bg-card/40 p-4">
-          <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold">
-            <Moon className="size-4" /> Most starred
-          </h3>
+      <section className="rounded-xl border border-border/60 bg-card/40 p-4">
+        <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold">
+          <Moon className="size-4" /> Most starred feeds
+        </h3>
+        {topStarredFeeds.length ? (
           <ul className="space-y-2">
             {topStarredFeeds.map((feed) => (
               <li key={feed.id} className="flex items-center gap-2 text-sm">
                 <FeedIcon feedId={feed.id} />
-                <Link
-                  to={`/feed/${feed.id}`}
-                  className="min-w-0 flex-1 truncate"
-                >
-                  {feed.title}
-                </Link>
+                <span className="min-w-0 flex-1 truncate">{feed.title}</span>
                 <span className="text-[11px] text-muted-foreground">
                   {feed.starred} starred
                 </span>
               </li>
             ))}
           </ul>
-        </section>
-      )}
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            Star articles and the feeds behind them show up here.
+          </p>
+        )}
+      </section>
     </div>
   );
 }

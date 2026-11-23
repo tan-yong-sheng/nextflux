@@ -6,8 +6,8 @@ import { collectInsights } from "./insights/collectInsights.js";
 import { rankForYou } from "./insights/rankArticles.js";
 import { DEMO_ARTICLES, DEMO_FEEDS } from "./insights/demoData.js";
 import SidebarCleanup from "./variants/SidebarCleanup.jsx";
-import ForYouPanel from "./variants/ForYouPanel.jsx";
-import PersonalizedPanel from "./variants/PersonalizedPanel.jsx";
+import { ForYouView } from "./variants/ForYouPanel.jsx";
+import { PersonalizedView } from "./variants/PersonalizedPanel.jsx";
 
 const VIEWS = [
   { key: "A", name: "A · Sidebar cleanup" },
@@ -54,21 +54,23 @@ export default function PrototypePage() {
           ))}
         </div>
 
-        <div className="mt-6 rounded-xl border border-border/60 bg-card/30 p-4">
+        {/* Demo feeds have fake ids — pointer-events-none keeps demo clicks
+            (mark read, unsubscribe, cards) away from real account actions. */}
+        <div className="pointer-events-none mt-6 rounded-xl border border-border/60 bg-card/30 p-4">
           {view === "A" && (
             <div className="max-w-[320px] rounded-lg border border-border/60 bg-sidebar p-2">
               <p className="px-2 pb-2 text-[11px] uppercase tracking-wide text-muted-foreground">
                 Sidebar (variant A)
               </p>
-              <SidebarCleanup insights={insights} />
+              <SidebarCleanup insights={insights} demo />
             </div>
           )}
           {view === "B" && (
             <div className="max-w-[560px]">
-              <ForYouPanel insights={insights} articles={DEMO_ARTICLES} />
+              <ForYouView insights={insights} articles={DEMO_ARTICLES} />
             </div>
           )}
-          {view === "C" && <PersonalizedPanel insights={insights} />}
+          {view === "C" && <PersonalizedView insights={insights} />}
         </div>
 
         <details className="mt-6 rounded-xl border border-border/60 p-4 text-sm">

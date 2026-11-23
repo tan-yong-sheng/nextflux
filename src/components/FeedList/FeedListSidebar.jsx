@@ -50,11 +50,16 @@ function SyncStatus() {
     </span>
   );
 }
-// PROTOTYPE — variant A only: a cleanup section in the sidebar.
+// PROTOTYPE — variant A only: a cleanup section in the sidebar. The hook
+// lives in the inner component so the Dexie scan runs only while A is on.
 function PrototypeSidebar() {
   const { variant } = usePrototypeVariant();
-  const { insights } = useFeedInsights();
   if (variant !== "A") return null;
+  return <PrototypeSidebarInsights />;
+}
+function PrototypeSidebarInsights() {
+  const { insights } = useFeedInsights();
+  if (!insights) return null;
   return <SidebarCleanup insights={insights} />;
 }
 const FeedListSidebar = ({ resizable = false }) => {

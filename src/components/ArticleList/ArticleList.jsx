@@ -23,7 +23,6 @@ import { useParams } from "react-router-dom";
 import ArticleListHeader from "./components/ArticleListHeader";
 import ArticleListContent from "./components/ArticleListContent";
 import { usePrototypeVariant, PrototypeSwitcher } from "@/components/Prototype/PrototypeSwitcher";
-import { usePersonalizationData } from "@/components/Prototype/usePersonalizationData";
 import ForYouPanel from "@/components/Prototype/variants/ForYouPanel";
 import PersonalizedPanel from "@/components/Prototype/variants/PersonalizedPanel";
 import ArticleListFooter from "./components/ArticleListFooter";
@@ -46,7 +45,6 @@ const ArticleList = () => {
   const isMedium = useIsMedium();
   // PROTOTYPE: ?variant=A|B|C swaps the rendered surface.
   const { variant, setVariant } = usePrototypeVariant();
-  const { insights, articles: allArticles } = usePersonalizationData();
   // 判断是否在移动端且正在查看文章详情
   const isArticleDetailOpen = isMedium && !!articleId;
   const scope = JSON.stringify([
@@ -171,9 +169,9 @@ const ArticleList = () => {
           </div>
         )}
         {variant === "B" ? (
-          <ForYouPanel insights={insights} articles={allArticles} />
+          <ForYouPanel />
         ) : variant === "C" ? (
-          <PersonalizedPanel insights={insights} />
+          <PersonalizedPanel />
         ) : (
           <ArticleListContent
             articles={$filteredArticles}

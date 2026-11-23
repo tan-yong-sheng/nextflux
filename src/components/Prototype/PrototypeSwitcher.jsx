@@ -12,7 +12,10 @@ export const PROTOTYPE_VARIANTS = [
 
 export function usePrototypeVariant() {
   const [params, setParams] = useSearchParams();
-  const variant = params.get("variant") ?? PROTOTYPE_VARIANTS[0].key;
+  const raw = params.get("variant");
+  // No variant means "off" — the prototype must never appear by accident,
+  // including in production builds.
+  const variant = PROTOTYPE_VARIANTS.some((v) => v.key === raw) ? raw : null;
   const setVariant = useCallback(
     (next) => {
       const updated = new URLSearchParams(params);
@@ -26,10 +29,14 @@ export function usePrototypeVariant() {
 
 export function PrototypeSwitcher({ current, onChange }) {
   const index = PROTOTYPE_VARIANTS.findIndex((v) => v.key === current);
-  const active = PROTOTYPE_VARIANTS[index] ?? PROTOTYPE_VARIANTS[0];
+  const active = index === -1 ? null : PROTOTYPE_VARIANTS[index];
 
   const cycle = useCallback(
     (direction) => {
+      if (index === -1) {
+        onChange(PROTOTYPE_VARIANTS[0].key);
+        return;
+      }
       const next =
         (index + direction + PROTOTYPE_VARIANTS.length) %
         PROTOTYPE_VARIANTS.length;
@@ -38,7 +45,10 @@ export function PrototypeSwitcher({ current, onChange }) {
     [index, onChange],
   );
 
+  // Arrow keys drive the switcher only while a variant is active, and never
+  // in production — otherwise they would hijack normal page navigation.
   useEffect(() => {
+    if (import.meta.env.PROD || index === -1) return;
     const onKey = (event) => {
       if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
       const target = event.target;
@@ -54,7 +64,7 @@ export function PrototypeSwitcher({ current, onChange }) {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [cycle]);
+  }, [cycle, index]);
 
   if (import.meta.env.PROD) return null;
 
@@ -70,7 +80,7 @@ export function PrototypeSwitcher({ current, onChange }) {
           <ChevronLeft className="size-4" />
         </button>
         <span className="px-2 text-xs font-medium tracking-wide">
-          {active.key} · {active.name}
+          {active ? `${active.key} · ${active.name}` : "prototype off"}
         </span>
         <button
           type="button"
