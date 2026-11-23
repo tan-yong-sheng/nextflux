@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Field,
+  FieldContent,
   FieldDescription,
   FieldGroup,
   FieldLabel,
@@ -275,7 +276,7 @@ export default function GitHubBackup() {
             <FieldDescription>{t(key("tokenHint"))}</FieldDescription>
           </Field>
 
-          <div className="flex items-center gap-2">
+          <Field orientation="horizontal" className="gap-2">
             <Checkbox
               id="github-remember"
               checked={config.rememberToken}
@@ -284,10 +285,12 @@ export default function GitHubBackup() {
                 update({ rememberToken: checked === true })
               }
             />
-            <FieldLabel htmlFor="github-remember" className="text-sm">
-              {t(key("rememberToken"))}
-            </FieldLabel>
-          </div>
+            <FieldContent>
+              <FieldLabel htmlFor="github-remember" className="text-sm">
+                {t(key("rememberToken"))}
+              </FieldLabel>
+            </FieldContent>
+          </Field>
         </FieldGroup>
 
         <div className="flex flex-wrap gap-2">
