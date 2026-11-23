@@ -310,7 +310,8 @@ export default {
       sync1hour: "Her saat",
       notifyNewArticles: "Yeni makale bildirimleri",
       notifyNewArticlesDescription:
-        "Yeni makaleler geldiğinde, Nextflux kapalıyken bile bildir. Telefonda önce Nextflux'i ana ekrana ekleyin.",
+        "Yeni makaleler geldiğinde sistem bildirimi göster. Bu kurulumda Web Push yapılandırılmış olmalıdır; iPhone ve iPad'de önce Nextflux'i ana ekrana ekleyin.",
+      notifyDisableFailed: "Bildirimler sunucuda kapatılamadı. Tekrar deneyin.",
       notifyDenied:
         "Bildirim izni reddedildi. Tarayıcı veya sistem ayarlarından Nextflux için bildirimlere izin verin.",
       notifyUnsupported: "Bu tarayıcı bildirimleri desteklemiyor.",

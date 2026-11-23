@@ -89,24 +89,28 @@ test("a push without a visible tab raises a system notification", async () => {
 });
 
 test("push titles follow the browser language with an English fallback", async () => {
+  const cases = [
+    ["zh-CN", 3, "3 篇新文章"],
+    ["fr-FR", 3, "3 nouveaux articles"],
+    ["fr-FR", 1, "1 nouvel article"],
+    ["tr-TR", 3, "3 yeni makale"],
+    // No navigator.language: one article in English.
+    [undefined, 1, "1 new article"],
+  ];
   const seen = {};
-  for (const language of ["zh-CN", "fr-FR", "tr-TR", undefined]) {
+  for (const [language, count, expected] of cases) {
     const shown = [];
     const events = await loadWorker({
       navigator: language ? { language } : {},
       registration: { showNotification: async (...args) => shown.push(args) },
     });
-    const event = pushEvent({ count: language ? 3 : 1, titles: [], url: "/" });
+    const event = pushEvent({ count, titles: [], url: "/" });
     events.get("push")(event);
     await event.settle();
-    seen[language || "fallback"] = shown[0][0];
+    seen[`${language || "fallback"}:${count}`] = shown[0][0];
+    assert.equal(shown[0][0], expected);
   }
-  assert.deepEqual(seen, {
-    "zh-CN": "3 篇新文章",
-    "fr-FR": "3 nouveaux articles",
-    "tr-TR": "3 yeni makale",
-    fallback: "1 new article",
-  });
+  assert.equal(Object.keys(seen).length, cases.length);
 });
 
 test("malformed push payloads are ignored", async () => {

@@ -60,6 +60,8 @@ const NOTICE_TITLES = {
 };
 
 function noticeTitle(count) {
+  // The service worker only sees its own navigator.language, not the app's
+  // language setting, so a push uses the browser language.
   const language = (self.navigator?.language || "en").toLowerCase();
   const format =
     NOTICE_TITLES[language.split("-")[0]] || NOTICE_TITLES.en;
@@ -89,6 +91,8 @@ function showPushNotice(notice) {
     icon: "/icon-192x192.png",
     badge: "/icon-192x192.png",
     tag: "nextflux:new-articles",
+    // A new batch replaces the previous notice and still alerts the reader.
+    renotify: true,
     data: { url: notice.url },
   });
 }

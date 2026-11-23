@@ -304,7 +304,8 @@ export default {
       sync1hour: "每 1 小时",
       notifyNewArticles: "新文章通知",
       notifyNewArticlesDescription:
-        "在收到新文章时发送通知，即使 Nextflux 已关闭。在手机上，请先将 Nextflux 添加到主屏幕。",
+        "新文章到达时发送系统通知。需要此部署已配置 Web Push；在 iPhone 和 iPad 上，请先将 Nextflux 添加到主屏幕。",
+      notifyDisableFailed: "无法在服务器上关闭通知，请重试。",
       notifyDenied: "通知权限已被拒绝，请在浏览器或系统设置中允许 Nextflux 发送通知。",
       notifyUnsupported: "当前浏览器不支持通知。",
       feeds: "订阅",

@@ -42,7 +42,11 @@ export default function General() {
   const toggleNotifications = async (checked) => {
     if (!checked) {
       updateSettings({ notifyNewArticles: false });
-      await syncPushState(false);
+      const result = await syncPushState(false);
+      // The server may still hold this endpoint; say so instead of pretending.
+      if (result === "failed") {
+        toast.error(t("settings.general.notifyDisableFailed"));
+      }
       return;
     }
     if (!supportsNotifications()) {
@@ -57,7 +61,7 @@ export default function General() {
     if (permission !== "granted") return;
     updateSettings({ notifyNewArticles: true });
     // Self-hosted builds have no push endpoint; the sync-driven system
-    // notification still works while the app is open.
+    // notification still covers the case where the app's tab is visible.
     await syncPushState(true);
   };
   return (
