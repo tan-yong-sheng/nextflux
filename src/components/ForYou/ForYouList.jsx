@@ -15,6 +15,7 @@ import ArticleCard from "@/components/ArticleList/components/ArticleCard.jsx";
 import ReadingLayout from "@/components/ReadingLayout.jsx";
 import ArticleView from "@/components/ArticleView/ArticleView.jsx";
 import { ScrollArea } from "@/components/ui/scroll-area.jsx";
+import { SidebarTrigger } from "@/components/ui/sidebar.jsx";
 
 const isVisibleFeed = (feed, showHiddenFeeds) =>
   showHiddenFeeds || !feed?.hide_globally;
@@ -25,6 +26,7 @@ function ForYouHeader({ count, hasSignal }) {
     <div className="px-2 z-10">
       <div className="article-list-header w-full border-b py-2">
         <div className="flex items-center gap-2">
+          <SidebarTrigger className="rounded-full" />
           <div className="grid flex-1 text-left text-sm leading-tight">
             <span className="truncate font-semibold">{t("forYou.title")}</span>
             <span className="truncate text-xs text-muted-foreground opacity-60">
