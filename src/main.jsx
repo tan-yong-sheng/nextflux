@@ -2,7 +2,6 @@ import "./i18n";
 import PwaUpdates from "@/components/Pwa/PwaUpdates";
 import SessionNotices from "@/components/SessionNotices";
 import { initTheme } from "@/stores/themeStore";
-import { listenForPushNotices } from "@/services/notificationService";
 import { syncPushState } from "@/services/pushService";
 import { settingsState } from "@/stores/settingsStore";
 import { createRoot } from "react-dom/client";
@@ -22,9 +21,7 @@ import {
 // 初始化主题
 initTheme();
 
-// Push notices reach a hidden or closed app; a visible tab gets the in-app toast.
 // An enabled setting also re-registers this device, covering key or endpoint changes.
-listenForPushNotices();
 if (settingsState.get().notifyNewArticles) void syncPushState(true);
 
 createRoot(document.getElementById("root")).render(

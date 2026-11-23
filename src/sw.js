@@ -7,9 +7,8 @@ self.addEventListener("message", (event) => {
   if (event.data?.type === "SKIP_WAITING") self.skipWaiting();
 });
 
-// A push keeps working while the tab is hidden or closed. A visible tab gets the
-// in-app toast so the wording follows the reader's language setting; everything
-// else becomes a system notification.
+// A push keeps working while the tab is hidden or closed and always becomes
+// a system notification.
 self.addEventListener("push", (event) => {
   const notice = readPushNotice(event.data);
   if (notice) event.waitUntil(showPushNotice(notice));
@@ -85,24 +84,13 @@ function readPushNotice(data) {
 }
 
 function showPushNotice(notice) {
-  return self.clients
-    .matchAll({ type: "window", includeUncontrolled: true })
-    .then((clients) => {
-      const visible = clients.find(
-        (client) => client.visibilityState === "visible",
-      );
-      if (visible) {
-        visible.postMessage({ type: "nextflux:new-articles", notice });
-        return undefined;
-      }
-      return self.registration.showNotification(noticeTitle(notice.count), {
-        body: notice.titles.join(" · "),
-        icon: "/icon-192x192.png",
-        badge: "/icon-192x192.png",
-        tag: "nextflux:new-articles",
-        data: { url: notice.url },
-      });
-    });
+  return self.registration.showNotification(noticeTitle(notice.count), {
+    body: notice.titles.join(" · "),
+    icon: "/icon-192x192.png",
+    badge: "/icon-192x192.png",
+    tag: "nextflux:new-articles",
+    data: { url: notice.url },
+  });
 }
 
 // No fetch handler: navigation, assets and API calls use the network normally.

@@ -1,5 +1,4 @@
 import i18n from "@/i18n";
-import { reportError } from "@/lib/errors.js";
 
 export function supportsNotifications() {
   return typeof window !== "undefined" && "Notification" in window;
@@ -39,18 +38,4 @@ export async function showNewArticles(notice) {
     return;
   }
   new Notification(title, options);
-}
-
-/**
- * A push that arrives while this tab is visible is handed back to the app so it
- * can use the reader's own wording instead of a system notification.
- */
-export function listenForPushNotices() {
-  if (typeof navigator === "undefined" || !navigator.serviceWorker) return;
-  navigator.serviceWorker.addEventListener("message", (event) => {
-    if (event.data?.type !== "nextflux:new-articles" || !event.data.notice) return;
-    showNewArticles(event.data.notice).catch((error) =>
-      reportError(error, "notification.push"),
-    );
-  });
 }

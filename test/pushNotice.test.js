@@ -36,10 +36,11 @@ function pushEvent(payload) {
   };
 }
 
-test("a push posts to the visible tab instead of a system notification", async () => {
-  const posted = [];
+test("a push always raises a system notification, even with a visible tab", async () => {
   const shown = [];
+  const posted = [];
   const events = await loadWorker({
+    navigator: { language: "en-US" },
     clients: {
       matchAll: async () => [
         { visibilityState: "visible", postMessage: (message) => posted.push(message) },
@@ -55,10 +56,10 @@ test("a push posts to the visible tab instead of a system notification", async (
   events.get("push")(event);
   await event.settle();
 
-  assert.deepEqual(JSON.parse(JSON.stringify(posted)), [
-    { type: "nextflux:new-articles", notice },
-  ]);
-  assert.equal(shown.length, 0);
+  assert.equal(posted.length, 0);
+  assert.equal(shown.length, 1);
+  assert.equal(shown[0][0], "2 new articles");
+  assert.deepEqual(JSON.parse(JSON.stringify(shown[0][1].data)), { url: "/" });
 });
 
 test("a push without a visible tab raises a system notification", async () => {
