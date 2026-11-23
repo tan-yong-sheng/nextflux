@@ -57,9 +57,14 @@ export async function onRequestPost({ request, env }) {
   if (gone.length) await pruneSubscriptions(env, userId, gone);
 
   const sent = results.filter(({ outcome }) => outcome === "sent").length;
-  const failed = results.filter(({ outcome }) => outcome.startsWith("failed")).length;
+  const failures = results.filter(({ outcome }) => outcome.startsWith("failed"));
+  const failed = failures.length;
   if (failed) {
-    console.error("web_push_delivery_failed", { userId, sent, failed, pruned: gone.length });
+    // Keep the distinct causes: encrypt, push (with its status) and network
+    // failures point at different problems.
+    const reasons = {};
+    for (const { outcome } of failures) reasons[outcome] = (reasons[outcome] ?? 0) + 1;
+    console.error("web_push_delivery_failed", { userId, sent, failed, reasons, pruned: gone.length });
   }
 
   // Miniflux does not retry webhook deliveries, so a total failure is
