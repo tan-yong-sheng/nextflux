@@ -104,7 +104,7 @@ test("listCommits passes the page through to the query", async () => {
     page: 2,
     perPage: 20,
   });
-  assert.match(requestedUrl, /page=2/);
+  assert.match(requestedUrl, /[?&]page=2(?:&|$)/);
   assert.match(requestedUrl, /per_page=20/);
 });
 

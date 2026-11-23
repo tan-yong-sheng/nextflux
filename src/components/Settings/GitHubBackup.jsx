@@ -55,6 +55,9 @@ export default function GitHubBackup() {
   // Bumped on every preview request and whenever the dialog closes, so a late
   // response cannot repopulate the preview after it was dismissed.
   const previewRequest = useRef(0);
+  // Bumped on every versions request and whenever the dialog closes or the
+  // account changes, so a late list response cannot reopen the dialog.
+  const versionsRequest = useRef(0);
 
   useEffect(() => {
     setConfig(getBackupConfig(account));
@@ -62,6 +65,7 @@ export default function GitHubBackup() {
     setVersionsPage(1);
     setVersionsHasMore(false);
     previewRequest.current += 1;
+    versionsRequest.current += 1;
     setPreview(null);
     setCanWrite(null);
     // The configuration is per account, so a new account reloads it.
@@ -146,11 +150,13 @@ export default function GitHubBackup() {
 
   const openVersions = () =>
     run("versions", "backup.github.versions", async () => {
+      const request = ++versionsRequest.current;
       const commits = await listBackupVersions(account, {
         config,
         page: 1,
         perPage: VERSIONS_PER_PAGE,
       });
+      if (request !== versionsRequest.current) return;
       setVersions(commits);
       setVersionsPage(1);
       setVersionsHasMore(commits.length === VERSIONS_PER_PAGE);
@@ -158,13 +164,16 @@ export default function GitHubBackup() {
 
   const loadMoreVersions = () =>
     run("versions", "backup.github.versions", async () => {
+      const request = ++versionsRequest.current;
       const page = versionsPage + 1;
       const commits = await listBackupVersions(account, {
         config,
         page,
         perPage: VERSIONS_PER_PAGE,
       });
-      setVersions((current) => [...(current || []), ...commits]);
+      // A late response must not reopen the dialog or extend a closed list.
+      if (request !== versionsRequest.current) return;
+      setVersions((current) => (current ? [...current, ...commits] : current));
       setVersionsPage(page);
       setVersionsHasMore(commits.length === VERSIONS_PER_PAGE);
     });
@@ -335,6 +344,7 @@ export default function GitHubBackup() {
             setVersionsPage(1);
             setVersionsHasMore(false);
             previewRequest.current += 1;
+            versionsRequest.current += 1;
             setPreview(null);
           }
         }}
@@ -391,7 +401,7 @@ export default function GitHubBackup() {
                     variant="ghost"
                     size="sm"
                     onClick={loadMoreVersions}
-                    disabled={busy === "versions"}
+                    disabled={Boolean(busy)}
                     aria-busy={busy === "versions"}
                   >
                     {busy === "versions" && (
