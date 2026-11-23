@@ -5,6 +5,7 @@ import { Sparkles } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useParams } from "react-router-dom";
 import { db } from "@/db/database.js";
+import { isVisibleFeed } from "@/domain/articles/articleScope.js";
 import { settingsState } from "@/stores/settingsStore.js";
 import { filteredArticles } from "@/stores/articlesStore.js";
 import {
@@ -17,9 +18,6 @@ import ArticleView from "@/components/ArticleView/ArticleView.jsx";
 import { ScrollArea } from "@/components/ui/scroll-area.jsx";
 import { SidebarTrigger } from "@/components/ui/sidebar.jsx";
 import { Spinner } from "@/components/ui/spinner.jsx";
-
-const isVisibleFeed = (feed, showHiddenFeeds) =>
-  showHiddenFeeds || !feed?.hide_globally;
 
 function ForYouHeader({ count, hasSignal }) {
   const { t } = useTranslation();
@@ -50,7 +48,11 @@ function ForYouReasons({ reasons }) {
       <Sparkles className="size-3 text-muted-foreground opacity-60" />
       {reasons.map((reason) => (
         <span
-          key={reason.type === "topic" ? reason.term : "feed"}
+          key={
+            reason.type === "topic"
+              ? `topic-${reason.term}`
+              : `feed-${reason.feedId}`
+          }
           className="rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground"
         >
           {reason.type === "topic"
@@ -80,6 +82,10 @@ function ForYouLoading() {
   );
 }
 
+// How many of the most recently read articles count as feed-read evidence.
+// Older reads say little about what the reader wants now.
+const READ_HISTORY_LIMIT = 500;
+
 export default function ForYouList() {
   const { articleId } = useParams();
   const { showHiddenFeeds } = useStore(settingsState);
@@ -91,8 +97,17 @@ export default function ForYouList() {
     () => db.articles.where("starred").equals(1).toArray(),
     [],
   );
+  // Read history grows forever, so only the most recent articles count as
+  // feed-read evidence. Miniflux assigns increasing ids, so the newest
+  // articles are the last ones in the index.
   const read = useLiveQuery(
-    () => db.articles.where("status").equals("read").toArray(),
+    () =>
+      db.articles
+        .where("status")
+        .equals("read")
+        .reverse()
+        .limit(READ_HISTORY_LIMIT)
+        .toArray(),
     [],
   );
   const feeds = useLiveQuery(() => db.feeds.toArray(), []);
@@ -131,19 +146,31 @@ export default function ForYouList() {
     const signals = buildSignals({ articles: [...history.values()] });
     const ranked = rankForYou({ articles: scoped, signals, limit: 50 });
 
+    // Refresh retained rows from the latest local copy so read and star
+    // changes show up, and drop rows that are gone or out of scope.
+    const latest = new Map();
+    for (const article of [...articles, ...starred, ...read]) {
+      latest.set(article.id, article);
+    }
+
     const merged = new Map();
     for (const item of ranked) merged.set(item.article.id, item);
     for (const [id, item] of rankedRef.current) {
-      if (!merged.has(id)) merged.set(id, item);
+      if (merged.has(id)) continue;
+      const fresh = latest.get(id);
+      if (!fresh || !visibleFeedIds.has(fresh.feedId)) continue;
+      merged.set(id, { ...item, article: fresh });
     }
     rankedRef.current = merged;
 
-    const ordered = [...merged.values()].sort(
-      (a, b) =>
-        b.score - a.score ||
-        b.publishedAt - a.publishedAt ||
-        b.article.id - a.article.id,
-    );
+    const ordered = [...merged.values()]
+      .sort(
+        (a, b) =>
+          b.score - a.score ||
+          b.publishedAt - a.publishedAt ||
+          b.article.id - a.article.id,
+      )
+      .slice(0, 50);
     setItems(ordered);
     setHasSignal(Boolean(signals.hasSignal));
   }, [articles, starred, read, visibleFeedIds, isLoading]);

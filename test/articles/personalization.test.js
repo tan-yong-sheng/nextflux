@@ -144,6 +144,27 @@ test("rankForYou keeps only articles that match a signal", () => {
   assert.deepEqual(ranked[0].reasons, [{ type: "topic", term: "sqlite" }]);
 });
 
+test("rankForYou falls back to recency when no unread article matches", () => {
+  const signals = buildSignals({
+    articles: [
+      article({ id: 1, starred: 1, title: "SQLite WAL mode" }),
+      article({ id: 2, status: "read", feedId: 9 }),
+    ],
+  });
+  const ranked = rankForYou({
+    signals,
+    articles: [
+      article({ id: 30, feedId: 12, title: "Gardening in July" }),
+      article({ id: 31, feedId: 12, title: "Bread baking" }),
+    ],
+  });
+
+  assert.deepEqual(
+    ranked.map((item) => item.article.id),
+    [31, 30],
+  );
+});
+
 test("rankForYou ranks topic matches above feed matches", () => {
   const signals = buildSignals({
     articles: [
@@ -166,7 +187,7 @@ test("rankForYou ranks topic matches above feed matches", () => {
   );
   assert.deepEqual(ranked[0].reasons, [
     { type: "topic", term: "sqlite" },
-    { type: "feed" },
+    { type: "feed", feedId: 7 },
   ]);
 });
 
@@ -183,7 +204,7 @@ test("rankForYou adds a feed reason for feeds the reader reads often", () => {
   });
 
   assert.equal(ranked.length, 1);
-  assert.deepEqual(ranked[0].reasons, [{ type: "feed" }]);
+  assert.deepEqual(ranked[0].reasons, [{ type: "feed", feedId: 7 }]);
 });
 
 test("rankForYou falls back to recency when there is no signal", () => {

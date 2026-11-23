@@ -19,13 +19,25 @@ const isCjk = (word) => /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p
 // Chinese and Japanese titles are written without spaces, so splitting on
 // whitespace alone leaves the whole title as one token. Segment it into
 // words instead, so topics can repeat across titles.
+const CJK_SEGMENTER =
+  typeof Intl !== "undefined" && Intl.Segmenter
+    ? new Intl.Segmenter(undefined, { granularity: "word" })
+    : null;
+
 const segmentChunk = (chunk) => {
   if (!chunk || !isCjk(chunk)) return [chunk];
-  if (typeof Intl === "undefined" || !Intl.Segmenter) return [chunk];
-  return [...new Intl.Segmenter(undefined, { granularity: "word" }).segment(chunk)]
+  if (!CJK_SEGMENTER) return [chunk];
+  return [...CJK_SEGMENTER.segment(chunk)]
     .filter(({ isWordLike }) => isWordLike)
     .map(({ segment }) => segment);
 };
+
+// Scoring weights. A topic hit is worth more than a feed hit because it
+// comes from what the reader explicitly starred, not from passive reading.
+const TOPIC_WEIGHT = 1.5;
+const FEED_WEIGHT = 3;
+const FEED_BONUS = 0.5;
+const MAX_REASONS = 3;
 
 // Dexie stores published_at/created_at as Miniflux's RFC3339 strings; demo and
 // migrated data may hold epoch ms. Normalize both to ms — Math.max on a
@@ -119,33 +131,42 @@ export function rankForYou({ articles = [], signals, limit = 50 } = {}) {
       topicCounts.has(word),
     );
     const topicScore =
-      hits.reduce((sum, word) => sum + topicCounts.get(word), 0) * 1.5;
+      hits.reduce((sum, word) => sum + topicCounts.get(word), 0) * TOPIC_WEIGHT;
 
     const feedReads = feedReadCounts.get(article.feedId);
     const feedScore =
-      feedReads && maxFeedReads ? (feedReads / maxFeedReads) * 3 + 0.5 : 0;
+      feedReads && maxFeedReads
+        ? (feedReads / maxFeedReads) * FEED_WEIGHT + FEED_BONUS
+        : 0;
 
     const score = topicScore + feedScore;
-    if (hasSignal && score <= 0) continue;
 
     const reasons = [];
     if (hits.length) {
       const top = [...new Set(hits)]
         .sort((a, b) => topicCounts.get(b) - topicCounts.get(a))
-        .slice(0, 3);
+        .slice(0, MAX_REASONS);
       for (const term of top) reasons.push({ type: "topic", term });
     }
-    if (feedScore > 0) reasons.push({ type: "feed" });
+    if (feedScore > 0) reasons.push({ type: "feed", feedId: article.feedId });
 
     scored.push({ article, score, reasons, publishedAt: publishedAt(article) });
   }
 
-  scored.sort(
+  // Fall back to recency only when nothing matched at all, so an active
+  // reader does not get an empty list just because their history lives in
+  // feeds that currently have no unread items.
+  const matchedAny = scored.some((item) => item.score > 0);
+  const kept = hasSignal && matchedAny
+    ? scored.filter((item) => item.score > 0)
+    : scored;
+
+  kept.sort(
     (a, b) =>
       b.score - a.score ||
       b.publishedAt - a.publishedAt ||
       b.article.id - a.article.id,
   );
 
-  return scored.slice(0, limit);
+  return kept.slice(0, limit);
 }
