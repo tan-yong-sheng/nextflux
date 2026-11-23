@@ -7,6 +7,7 @@
  */
 
 import { accountStorageKey } from "../domain/auth/accounts.js";
+import { reportError } from "../lib/errors.js";
 
 const STORAGE_SUFFIX = "githubBackup:v1";
 const sessionTokens = new Map();
@@ -33,7 +34,10 @@ function readStored(account) {
       token: parsed.rememberToken ? parsed.token || "" : "",
       rememberToken: Boolean(parsed.rememberToken),
     };
-  } catch {
+  } catch (error) {
+    // A corrupt entry must be visible in the logs, otherwise the backup
+    // silently falls back to the defaults.
+    reportError(error, "backup.github.config.read");
     return { ...DEFAULT_CONFIG };
   }
 }
