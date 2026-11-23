@@ -56,7 +56,8 @@ export default function General() {
     }
     if (permission !== "granted") return;
     updateSettings({ notifyNewArticles: true });
-    // Self-hosted builds have no push endpoint; the in-app notice still works.
+    // Self-hosted builds have no push endpoint; the sync-driven system
+    // notification still works while the app is open.
     await syncPushState(true);
   };
   return (
