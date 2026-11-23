@@ -16,6 +16,17 @@ const STOP_WORDS = new Set([
 // letters" rule for Latin words would throw every Chinese title away.
 const isCjk = (word) => /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u.test(word);
 
+// Chinese and Japanese titles are written without spaces, so splitting on
+// whitespace alone leaves the whole title as one token. Segment it into
+// words instead, so topics can repeat across titles.
+const segmentChunk = (chunk) => {
+  if (!chunk || !isCjk(chunk)) return [chunk];
+  if (typeof Intl === "undefined" || !Intl.Segmenter) return [chunk];
+  return [...new Intl.Segmenter(undefined, { granularity: "word" }).segment(chunk)]
+    .filter(({ isWordLike }) => isWordLike)
+    .map(({ segment }) => segment);
+};
+
 // Dexie stores published_at/created_at as Miniflux's RFC3339 strings; demo and
 // migrated data may hold epoch ms. Normalize both to ms — Math.max on a
 // string yields NaN.
@@ -32,6 +43,7 @@ export const tokenize = (text) =>
     .toLowerCase()
     .replace(/[^\p{L}\p{N}\s]/gu, " ")
     .split(/\s+/)
+    .flatMap((chunk) => segmentChunk(chunk))
     .filter((word) => word.length > 0 && !STOP_WORDS.has(word))
     .filter((word) => (isCjk(word) ? word.length > 1 : word.length > 3));
 
@@ -50,16 +62,18 @@ export function buildSignals({ articles = [] } = {}) {
 
   for (const article of articles) {
     if (article.status === "removed") continue;
+    // A starred article is usually also read, so it counts for both signals.
+    if (article.status === "read") {
+      feedReadCounts.set(
+        article.feedId,
+        (feedReadCounts.get(article.feedId) || 0) + 1,
+      );
+    }
     if (article.starred === 1) {
       starredCount += 1;
       for (const word of tokenize(article.title)) {
         topicCounts.set(word, (topicCounts.get(word) || 0) + 1);
       }
-    } else if (article.status === "read") {
-      feedReadCounts.set(
-        article.feedId,
-        (feedReadCounts.get(article.feedId) || 0) + 1,
-      );
     }
   }
 

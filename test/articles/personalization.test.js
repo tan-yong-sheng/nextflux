@@ -34,7 +34,16 @@ test("tokenize drops short words, stop words and punctuation", () => {
 });
 
 test("tokenize keeps non-latin words", () => {
-  assert.deepEqual(tokenize("数据库 迁移"), ["数据库", "迁移"]);
+  assert.deepEqual(tokenize("数据库 迁移"), ["数据", "迁移"]);
+});
+
+test("tokenize segments CJK titles written without spaces", () => {
+  const tokens = tokenize("苹果发布新款手机数据库迁移方案");
+
+  assert.equal(tokens.includes("苹果"), true);
+  assert.equal(tokens.includes("数据"), true);
+  assert.equal(tokens.includes("迁移"), true);
+  assert.equal(tokens.includes("苹果发布新款手机数据库迁移方案"), false);
 });
 
 test("buildSignals collects topics from starred titles and reads per feed", () => {
@@ -53,6 +62,19 @@ test("buildSignals collects topics from starred titles and reads per feed", () =
   assert.equal(signals.feedReadCounts.get(2), 2);
   assert.equal(signals.maxFeedReads, 2);
   assert.equal(signals.hasSignal, true);
+});
+
+test("buildSignals counts a starred and read article for both signals", () => {
+  const signals = buildSignals({
+    articles: [
+      article({ id: 1, starred: 1, status: "read", feedId: 1, title: "SQLite WAL mode" }),
+      article({ id: 2, starred: 1, status: "read", feedId: 1, title: "SQLite tuning" }),
+    ],
+  });
+
+  assert.equal(signals.starredCount, 2);
+  assert.equal(signals.feedReadCounts.get(1), 2);
+  assert.equal(signals.topicCounts.get("sqlite"), 2);
 });
 
 test("buildSignals drops topics seen in only one starred title", () => {

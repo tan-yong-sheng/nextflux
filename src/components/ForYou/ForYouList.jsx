@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useStore } from "@nanostores/react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { Sparkles } from "lucide-react";
@@ -16,6 +16,7 @@ import ReadingLayout from "@/components/ReadingLayout.jsx";
 import ArticleView from "@/components/ArticleView/ArticleView.jsx";
 import { ScrollArea } from "@/components/ui/scroll-area.jsx";
 import { SidebarTrigger } from "@/components/ui/sidebar.jsx";
+import { Spinner } from "@/components/ui/spinner.jsx";
 
 const isVisibleFeed = (feed, showHiddenFeeds) =>
   showHiddenFeeds || !feed?.hide_globally;
@@ -71,12 +72,33 @@ function ForYouEmpty() {
   );
 }
 
+function ForYouLoading() {
+  return (
+    <div className="flex h-full items-center justify-center p-6">
+      <Spinner className="size-5 text-muted-foreground opacity-60" />
+    </div>
+  );
+}
+
 export default function ForYouList() {
   const { articleId } = useParams();
   const { showHiddenFeeds } = useStore(settingsState);
-  const articles = useLiveQuery(() => db.articles.toArray(), []);
+  const articles = useLiveQuery(
+    () => db.articles.where("status").equals("unread").toArray(),
+    [],
+  );
+  const starred = useLiveQuery(
+    () => db.articles.where("starred").equals(1).toArray(),
+    [],
+  );
+  const read = useLiveQuery(
+    () => db.articles.where("status").equals("read").toArray(),
+    [],
+  );
   const feeds = useLiveQuery(() => db.feeds.toArray(), []);
   const activeRef = useRef(null);
+  const [items, setItems] = useState([]);
+  const [hasSignal, setHasSignal] = useState(false);
 
   const visibleFeedIds = useMemo(() => {
     if (!feeds) return null;
@@ -87,19 +109,44 @@ export default function ForYouList() {
     );
   }, [feeds, showHiddenFeeds]);
 
-  const { items, signals } = useMemo(() => {
-    if (!articles || !visibleFeedIds) {
-      return { items: [], signals: { hasSignal: false } };
-    }
-    const built = buildSignals({ articles });
+  const isLoading = !articles || !starred || !read || !visibleFeedIds;
+
+  // Keep articles that were already ranked even after they are read: marking
+  // an article read while scrolling would otherwise drop it from the list
+  // under the cursor and break keyboard navigation.
+  const rankedRef = useRef(new Map());
+
+  useEffect(() => {
+    if (isLoading) return;
+
     const scoped = articles.filter((article) =>
       visibleFeedIds.has(article.feedId),
     );
-    return {
-      items: rankForYou({ articles: scoped, signals: built, limit: 50 }),
-      signals: built,
-    };
-  }, [articles, visibleFeedIds]);
+    // Starred and read overlap (a starred article is usually read too);
+    // merge by id so a feed is not counted twice for the same article.
+    const history = new Map();
+    for (const article of [...starred, ...read]) {
+      history.set(article.id, article);
+    }
+    const signals = buildSignals({ articles: [...history.values()] });
+    const ranked = rankForYou({ articles: scoped, signals, limit: 50 });
+
+    const merged = new Map();
+    for (const item of ranked) merged.set(item.article.id, item);
+    for (const [id, item] of rankedRef.current) {
+      if (!merged.has(id)) merged.set(id, item);
+    }
+    rankedRef.current = merged;
+
+    const ordered = [...merged.values()].sort(
+      (a, b) =>
+        b.score - a.score ||
+        b.publishedAt - a.publishedAt ||
+        b.article.id - a.article.id,
+    );
+    setItems(ordered);
+    setHasSignal(Boolean(signals.hasSignal));
+  }, [articles, starred, read, visibleFeedIds, isLoading]);
 
   // Keep the shared list in sync so keyboard navigation and the reader panel
   // follow the ranked order instead of the feed order.
@@ -114,9 +161,11 @@ export default function ForYouList() {
   return (
     <ReadingLayout reader={<ArticleView />}>
       <div className="article-list-panel flex h-dvh w-full flex-col overflow-hidden">
-        <ForYouHeader count={items.length} hasSignal={signals?.hasSignal} />
+        <ForYouHeader count={items.length} hasSignal={hasSignal} />
         <div className="min-h-0 flex-1 overflow-hidden">
-          {items.length === 0 ? (
+          {isLoading ? (
+            <ForYouLoading />
+          ) : items.length === 0 ? (
             <ForYouEmpty />
           ) : (
             <ScrollArea className="h-full">

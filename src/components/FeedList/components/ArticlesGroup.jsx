@@ -51,7 +51,11 @@ const ArticlesGroup = () => {
       <SidebarMenu>
         <SidebarMenuItem>
           <SidebarMenuButton
-            isActive={!feedId && !categoryId}
+            isActive={
+              !feedId &&
+              !categoryId &&
+              !pathname.startsWith("/foryou")
+            }
             render={
               <Link to="/" onClick={() => isMobile && setOpenMobile(false)}>
                 <span className="font-semibold">{text}</span>
@@ -65,7 +69,7 @@ const ArticlesGroup = () => {
         </SidebarMenuItem>
         <SidebarMenuItem>
           <SidebarMenuButton
-            isActive={pathname === "/foryou"}
+            isActive={pathname.startsWith("/foryou")}
             render={
               <Link
                 to="/foryou"
