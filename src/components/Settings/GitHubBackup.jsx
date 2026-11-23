@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { CloudUpload, History, ShieldCheck } from "lucide-react";
@@ -39,6 +39,8 @@ import { useStore } from "@nanostores/react";
 
 const key = (name) => `settings.backup.github.${name}`;
 
+const VERSIONS_PER_PAGE = 20;
+
 export default function GitHubBackup() {
   const { t } = useTranslation();
   const account = useStore(authState);
@@ -46,12 +48,20 @@ export default function GitHubBackup() {
   const [config, setConfig] = useState(() => getBackupConfig(account));
   const [busy, setBusy] = useState(null);
   const [versions, setVersions] = useState(null);
+  const [versionsPage, setVersionsPage] = useState(1);
+  const [versionsHasMore, setVersionsHasMore] = useState(false);
   const [preview, setPreview] = useState(null);
   const [canWrite, setCanWrite] = useState(null);
+  // Bumped on every preview request and whenever the dialog closes, so a late
+  // response cannot repopulate the preview after it was dismissed.
+  const previewRequest = useRef(0);
 
   useEffect(() => {
     setConfig(getBackupConfig(account));
     setVersions(null);
+    setVersionsPage(1);
+    setVersionsHasMore(false);
+    previewRequest.current += 1;
     setPreview(null);
     setCanWrite(null);
     // The configuration is per account, so a new account reloads it.
@@ -70,6 +80,7 @@ export default function GitHubBackup() {
     () => /^[\w.-]+\/[\w.-]+$/.test((config.repo || "").trim()),
     [config.repo],
   );
+  const branchValid = (config.branch || "").trim().length > 0;
 
   const feedApi = {
     exportOPML,
@@ -135,15 +146,39 @@ export default function GitHubBackup() {
 
   const openVersions = () =>
     run("versions", "backup.github.versions", async () => {
-      const commits = await listBackupVersions(account, { config });
+      const commits = await listBackupVersions(account, {
+        config,
+        page: 1,
+        perPage: VERSIONS_PER_PAGE,
+      });
       setVersions(commits);
+      setVersionsPage(1);
+      setVersionsHasMore(commits.length === VERSIONS_PER_PAGE);
     });
 
-  const selectVersion = (sha) =>
-    run("preview", "backup.github.preview", async () => {
-      const result = await previewRestore(account, sha, { config, feeds: feedApi });
-      setPreview(result);
+  const loadMoreVersions = () =>
+    run("versions", "backup.github.versions", async () => {
+      const page = versionsPage + 1;
+      const commits = await listBackupVersions(account, {
+        config,
+        page,
+        perPage: VERSIONS_PER_PAGE,
+      });
+      setVersions((current) => [...(current || []), ...commits]);
+      setVersionsPage(page);
+      setVersionsHasMore(commits.length === VERSIONS_PER_PAGE);
     });
+
+  const selectVersion = (sha) => {
+    const request = ++previewRequest.current;
+    return run("preview", "backup.github.preview", async () => {
+      const result = await previewRestore(account, sha, {
+        config,
+        feeds: feedApi,
+      });
+      if (request === previewRequest.current) setPreview(result);
+    });
+  };
 
   const runRestore = () =>
     run("restore", "backup.github.restore", async () => {
@@ -162,7 +197,7 @@ export default function GitHubBackup() {
       setVersions(null);
     });
 
-  const disabled = !repoValid || !config.token || !!busy;
+  const disabled = !repoValid || !branchValid || !config.token || !!busy;
   // A token without write access cannot create a backup commit.
   const backupDisabled = disabled || canWrite === false;
 
@@ -188,6 +223,7 @@ export default function GitHubBackup() {
               id="github-repo"
               value={config.repo}
               placeholder="owner/repository"
+              disabled={Boolean(busy)}
               onChange={(event) => update({ repo: event.target.value })}
             />
             <FieldDescription>{t(key("repoHint"))}</FieldDescription>
@@ -199,6 +235,7 @@ export default function GitHubBackup() {
               <Input
                 id="github-branch"
                 value={config.branch}
+                disabled={Boolean(busy)}
                 onChange={(event) => update({ branch: event.target.value })}
               />
             </Field>
@@ -209,6 +246,7 @@ export default function GitHubBackup() {
               <Input
                 id="github-path"
                 value={config.pathPrefix}
+                disabled={Boolean(busy)}
                 onChange={(event) => update({ pathPrefix: event.target.value })}
               />
             </Field>
@@ -222,6 +260,7 @@ export default function GitHubBackup() {
               autoComplete="off"
               value={config.token}
               placeholder="github_pat_..."
+              disabled={Boolean(busy)}
               onChange={(event) => update({ token: event.target.value })}
             />
             <FieldDescription>{t(key("tokenHint"))}</FieldDescription>
@@ -231,6 +270,7 @@ export default function GitHubBackup() {
             <Checkbox
               id="github-remember"
               checked={config.rememberToken}
+              disabled={Boolean(busy)}
               onCheckedChange={(checked) =>
                 update({ rememberToken: checked === true })
               }
@@ -292,6 +332,9 @@ export default function GitHubBackup() {
         onOpenChange={(open) => {
           if (!open) {
             setVersions(null);
+            setVersionsPage(1);
+            setVersionsHasMore(false);
+            previewRequest.current += 1;
             setPreview(null);
           }
         }}
@@ -327,6 +370,7 @@ export default function GitHubBackup() {
                   <button
                     type="button"
                     className="w-full rounded-md px-2 py-1 text-left text-sm hover:bg-accent"
+                    disabled={Boolean(busy)}
                     onClick={() => selectVersion(commit.sha)}
                   >
                     <span className="block truncate">{commit.message}</span>
@@ -339,6 +383,22 @@ export default function GitHubBackup() {
               {versions?.length === 0 && (
                 <li className="text-sm text-muted-foreground">
                   {t(key("noVersions"))}
+                </li>
+              )}
+              {versionsHasMore && (
+                <li>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={loadMoreVersions}
+                    disabled={busy === "versions"}
+                    aria-busy={busy === "versions"}
+                  >
+                    {busy === "versions" && (
+                      <Spinner data-icon="inline-start" />
+                    )}
+                    {t(key("loadMore"))}
+                  </Button>
                 </li>
               )}
             </ul>

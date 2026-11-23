@@ -99,7 +99,9 @@ export class GitHubClient {
    */
   async testAccess(repo) {
     const parsed = parseRepo(repo);
-    if (!parsed) return { ok: false, status: 0 };
+    if (!parsed) {
+      return { ok: false, status: 0, error: new GitHubError(0, "invalidRepo") };
+    }
     try {
       const response = await this.request(
         `${API_ROOT}/repos/${encodePath(parsed.fullName)}`,
@@ -149,24 +151,36 @@ export class GitHubClient {
   async commitFiles(repo, { branch, message, files } = {}) {
     const parsed = parseRepo(repo);
     if (!parsed) throw new GitHubError(0, "invalidRepo");
-    const base = await this.request(
-      `${API_ROOT}/repos/${encodePath(parsed.fullName)}/git/ref/heads/${encodePath(branch)}`,
-    );
-    const baseRef = await base.json();
-    const baseCommitSha = baseRef.object?.sha;
+    const repoUrl = `${API_ROOT}/repos/${encodePath(parsed.fullName)}`;
 
-    const commit = await this.request(
-      `${API_ROOT}/repos/${encodePath(parsed.fullName)}/git/commits/${encodePath(baseCommitSha)}`,
-    );
-    const baseCommit = await commit.json();
+    // A brand-new repository has no branch to build the commit on. Its ref
+    // lookup answers 404, and the first commit is created without a parent
+    // before a new branch is pointed at it.
+    let baseCommitSha = null;
+    try {
+      const base = await this.request(
+        `${repoUrl}/git/ref/heads/${encodePath(branch)}`,
+      );
+      baseCommitSha = (await base.json()).object?.sha || null;
+    } catch (error) {
+      if (error.status !== 404) throw error;
+    }
+
+    let baseTreeSha;
+    if (baseCommitSha) {
+      const commit = await this.request(
+        `${repoUrl}/git/commits/${encodePath(baseCommitSha)}`,
+      );
+      baseTreeSha = (await commit.json()).tree?.sha;
+    }
 
     const tree = await this.request(
-      `${API_ROOT}/repos/${encodePath(parsed.fullName)}/git/trees`,
+      `${repoUrl}/git/trees`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          base_tree: baseCommit.tree?.sha,
+          ...(baseTreeSha ? { base_tree: baseTreeSha } : {}),
           tree: files.map((file) => ({
             path: file.path,
             mode: "100644",
@@ -179,25 +193,31 @@ export class GitHubClient {
     const treeResult = await tree.json();
 
     const newCommit = await this.request(
-      `${API_ROOT}/repos/${encodePath(parsed.fullName)}/git/commits`,
+      `${repoUrl}/git/commits`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           message,
           tree: treeResult.sha,
-          parents: [baseCommitSha],
+          parents: baseCommitSha ? [baseCommitSha] : [],
         }),
       },
     );
     const commitResult = await newCommit.json();
 
     const reference = await this.request(
-      `${API_ROOT}/repos/${encodePath(parsed.fullName)}/git/refs/heads/${encodePath(branch)}`,
+      baseCommitSha
+        ? `${repoUrl}/git/refs/heads/${encodePath(branch)}`
+        : `${repoUrl}/git/refs`,
       {
-        method: "PATCH",
+        method: baseCommitSha ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sha: commitResult.sha, force: false }),
+        body: JSON.stringify(
+          baseCommitSha
+            ? { sha: commitResult.sha, force: false }
+            : { ref: `refs/heads/${branch}`, sha: commitResult.sha },
+        ),
       },
     );
     const referenceResult = await reference.json();
@@ -215,10 +235,14 @@ export class GitHubClient {
   /**
    * List the commits that touched a path, newest first.
    */
-  async listCommits(repo, path, { branch, perPage = 20 } = {}) {
+  async listCommits(repo, path, { branch, perPage = 20, page = 1 } = {}) {
     const parsed = parseRepo(repo);
     if (!parsed) throw new GitHubError(0, "invalidRepo");
-    const query = new URLSearchParams({ path, per_page: String(perPage) });
+    const query = new URLSearchParams({
+      path,
+      per_page: String(perPage),
+      page: String(page),
+    });
     if (branch) query.set("sha", branch);
 
     const response = await this.request(

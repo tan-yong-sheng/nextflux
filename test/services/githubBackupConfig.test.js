@@ -63,6 +63,16 @@ test("drops the stored token when the opt-in is turned off", () => {
   });
 });
 
+test("keeps a session-only token when saving other fields", () => {
+  withStorage((store) => {
+    saveBackupConfig(ACCOUNT, { repo: "o/r", token: "secret" });
+    saveBackupConfig(ACCOUNT, { repo: "o/other" });
+    assert.equal(getBackupConfig(ACCOUNT).repo, "o/other");
+    assert.equal(getBackupConfig(ACCOUNT).token, "secret");
+    assert.equal([...store.values()].join("").includes("secret"), false);
+  });
+});
+
 test("keeps the configuration per account", () => {
   withStorage(() => {
     saveBackupConfig(ACCOUNT, { repo: "o/one" });

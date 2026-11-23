@@ -308,7 +308,7 @@ export default {
           "Aboneliklerinizin bir kopyasını bir GitHub deposunda tutun ve gerektiğinde önceki bir sürümü geri yükleyin.",
         repo: "Depo",
         repoHint:
-          "Yazma yetkiniz olan özel bir depo, owner/repository biçiminde.",
+          "Yazma yetkiniz olan bir depo, owner/repository biçiminde. Özel bir depo önerilir.",
         branch: "Dal",
         pathPrefix: "Klasör",
         token: "İnce ayarlı erişim belirteci",
@@ -324,6 +324,7 @@ export default {
         restore: "Geri yükle",
         versionsTitle: "Yedek sürümleri",
         noVersions: "Henüz yedek sürümü yok",
+        loadMore: "Daha fazla yükle",
         previewTitle: "Geri yükleme önizlemesi",
         previewSummary:
           "{{added}} abonelik eklenecek, {{present}} abonelik zaten kayıtlı.",
@@ -340,7 +341,8 @@ export default {
         missingRepo: "Önce bir depo girin",
         missingToken: "Önce bir erişim belirteci girin",
         invalidRepo: "Depo adı geçerli değil",
-        offline: "GitHub'e bağlanılamadı, lütfen tekrar deneyin",
+        invalidExport: "Abonelik dışa aktarımı okunamadı",
+        offline: "GitHub'a bağlanılamadı, lütfen tekrar deneyin",
         unknown: "GitHub isteği başarısız oldu, lütfen tekrar deneyin",
       },
     },

@@ -54,7 +54,9 @@ export function getBackupConfig(account) {
 }
 
 export function saveBackupConfig(account, changes) {
-  const current = readStored(account);
+  // Merge over the effective config (stored + session token): a caller that
+  // only edits repo/branch/path must not drop a session-only token.
+  const current = getBackupConfig(account);
   const next = { ...current, ...changes };
 
   if (next.token) sessionTokens.set(account?.id, next.token);

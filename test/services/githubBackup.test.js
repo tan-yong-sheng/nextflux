@@ -129,9 +129,19 @@ test("lists the backup versions stored in the repository", async () => {
   const client = makeClient({
     commits: [{ sha: "abc", message: "backup", date: "2026-11-23" }],
   });
-  const commits = await listBackupVersions(ACCOUNT, { config: CONFIG, client });
+  const commits = await listBackupVersions(ACCOUNT, {
+    config: CONFIG,
+    client,
+    page: 2,
+    perPage: 50,
+  });
   assert.equal(commits.length, 1);
   assert.equal(client.calls[0].method, "listCommits");
+  assert.equal(client.calls[0].repo, "octocat/hello");
+  assert.match(client.calls[0].path, /subscriptions\.opml$/);
+  assert.equal(client.calls[0].options.branch, "main");
+  assert.equal(client.calls[0].options.page, 2);
+  assert.equal(client.calls[0].options.perPage, 50);
 });
 
 test("preview compares the stored version with the server subscriptions", async () => {
@@ -162,6 +172,11 @@ test("restore imports the version and refreshes the feeds", async () => {
   assert.equal(result.diff.added.length, 2);
   assert.equal(imported[0], OPML);
   assert.equal(imported[1], "refresh");
+  const readCalls = client.calls.filter((call) => call.method === "readFile");
+  assert.equal(
+    readCalls.some((call) => call.options?.ref === "sha1"),
+    true,
+  );
 });
 
 test("restore does not import when every feed is already present", async () => {
@@ -178,11 +193,30 @@ test("restore does not import when every feed is already present", async () => {
       importOPMLText: async () => {
         called = true;
       },
-      refreshAllFeeds: async () => {},
+      refreshAllFeeds: async () => {
+        called = true;
+      },
     },
   });
   assert.equal(result.imported, false);
   assert.equal(called, false);
+});
+
+test("backup refuses an export that is not an OPML document", async () => {
+  const client = makeClient();
+  await assert.rejects(
+    () =>
+      backupAccount(ACCOUNT, {
+        config: CONFIG,
+        client,
+        feeds: { exportOPML: async () => "<html>error</html>" },
+      }),
+    (error) => error?.code === "invalidExport",
+  );
+  assert.equal(
+    client.calls.filter((call) => call.method === "commitFiles").length,
+    0,
+  );
 });
 
 test("the stored path is derived from the account key", async () => {

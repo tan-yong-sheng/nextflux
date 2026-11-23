@@ -90,12 +90,34 @@ test("listCommits maps the GitHub payload to the fields the UI needs", async () 
   assert.equal(commits[0].date, "2026-11-23T10:00:00Z");
 });
 
+test("listCommits passes the page through to the query", async () => {
+  let requestedUrl = "";
+  const client = new GitHubClient({
+    token: "t",
+    fetchImpl: async (url) => {
+      requestedUrl = url;
+      return jsonResponse([]);
+    },
+  });
+  await client.listCommits("o/r", "nextflux/a/subscriptions.opml", {
+    branch: "main",
+    page: 2,
+    perPage: 20,
+  });
+  assert.match(requestedUrl, /page=2/);
+  assert.match(requestedUrl, /per_page=20/);
+});
+
 test("commitFiles writes every file of the backup in one commit", async () => {
   const requests = [];
   const client = new GitHubClient({
     token: "t",
     fetchImpl: async (url, options = {}) => {
-      requests.push({ url, method: options.method || "GET" });
+      requests.push({
+        url,
+        method: options.method || "GET",
+        body: options.body ? JSON.parse(options.body) : null,
+      });
       if (url.includes("/git/ref/heads/")) {
         return jsonResponse({ object: { sha: "base-sha" } });
       }
@@ -125,10 +147,74 @@ test("commitFiles writes every file of the backup in one commit", async () => {
   assert.equal(result.commitUrl, "https://github.com/o/r/commit/new-commit");
   const treeRequest = requests.find((request) => request.url.endsWith("/git/trees"));
   assert.equal(treeRequest.method, "POST");
+  assert.equal(treeRequest.body.base_tree, "tree-sha");
+  assert.deepEqual(treeRequest.body.tree, [
+    {
+      path: "nextflux/a/subscriptions.opml",
+      mode: "100644",
+      type: "blob",
+      content: "<opml/>",
+    },
+    {
+      path: "nextflux/a/meta.json",
+      mode: "100644",
+      type: "blob",
+      content: "{}",
+    },
+  ]);
+  const commitRequest = requests.find((request) =>
+    request.url.endsWith("/git/commits") && request.method === "POST",
+  );
+  assert.deepEqual(commitRequest.body.parents, ["base-sha"]);
   const reference = requests.find((request) =>
     request.url.includes("/git/refs/heads/"),
   );
   assert.equal(reference.method, "PATCH");
+  assert.deepEqual(reference.body, { sha: "new-commit", force: false });
+});
+
+test("commitFiles initializes a brand-new repository without a parent", async () => {
+  const requests = [];
+  const client = new GitHubClient({
+    token: "t",
+    fetchImpl: async (url, options = {}) => {
+      requests.push({
+        url,
+        method: options.method || "GET",
+        body: options.body ? JSON.parse(options.body) : null,
+      });
+      if (url.includes("/git/ref/heads/")) {
+        return jsonResponse({ message: "Not Found" }, { status: 404 });
+      }
+      if (url.endsWith("/git/trees")) {
+        return jsonResponse({ sha: "new-tree" });
+      }
+      if (url.endsWith("/git/commits")) {
+        return jsonResponse({ sha: "new-commit" });
+      }
+      return jsonResponse({ ref: "refs/heads/main" });
+    },
+  });
+
+  const result = await client.commitFiles("o/r", {
+    branch: "main",
+    message: "backup",
+    files: [{ path: "nextflux/a/subscriptions.opml", content: "<opml/>" }],
+  });
+
+  assert.equal(result.commitSha, "new-commit");
+  const treeRequest = requests.find((request) => request.url.endsWith("/git/trees"));
+  assert.equal("base_tree" in treeRequest.body, false);
+  const commitRequest = requests.find((request) =>
+    request.url.endsWith("/git/commits") && request.method === "POST",
+  );
+  assert.deepEqual(commitRequest.body.parents, []);
+  const reference = requests.find((request) => request.url.endsWith("/git/refs"));
+  assert.equal(reference.method, "POST");
+  assert.deepEqual(reference.body, {
+    ref: "refs/heads/main",
+    sha: "new-commit",
+  });
 });
 
 test("testAccess rejects an invalid repository before any request", async () => {
@@ -142,6 +228,7 @@ test("testAccess rejects an invalid repository before any request", async () => 
   });
   const result = await client.testAccess("not-a-repo");
   assert.equal(result.ok, false);
+  assert.equal(result.error.code, "invalidRepo");
   assert.equal(called, false);
 });
 

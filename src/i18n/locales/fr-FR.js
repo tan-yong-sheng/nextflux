@@ -313,7 +313,7 @@ export default {
           "Conservez une copie de vos abonnements dans un dépôt GitHub et restaurez une version antérieure au besoin.",
         repo: "Dépôt",
         repoHint:
-          "Un dépôt privé où vous disposez du droit d'écriture, au format owner/repository.",
+          "Un dépôt où vous disposez du droit d'écriture, au format owner/repository. Un dépôt privé est recommandé.",
         branch: "Branche",
         pathPrefix: "Dossier",
         token: "Jeton d'accès à portée fine",
@@ -329,6 +329,7 @@ export default {
         restore: "Restaurer",
         versionsTitle: "Versions de sauvegarde",
         noVersions: "Aucune version de sauvegarde",
+        loadMore: "Charger plus",
         previewTitle: "Aperçu de la restauration",
         previewSummary:
           "{{added}} abonnements seront ajoutés, {{present}} sont déjà suivis.",
@@ -345,6 +346,7 @@ export default {
         missingRepo: "Saisissez d'abord un dépôt",
         missingToken: "Saisissez d'abord un jeton d'accès",
         invalidRepo: "Le nom du dépôt n'est pas valide",
+        invalidExport: "L'export des abonnements est illisible",
         offline: "Impossible de joindre GitHub, veuillez réessayer",
         unknown: "La requête GitHub a échoué, veuillez réessayer",
       },

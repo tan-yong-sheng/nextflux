@@ -32,8 +32,8 @@ nextflux/
 ```
 
 - `account-key`: first 12 chars of `base64url(sha256(account.id))`, where `account.id` is
-  `serverUrl + userId` (`src/domain/auth/accounts.js`). Stable, filesystem-safe, and does
-  not leak the server URL.
+  `accountId(auth)` in `src/domain/auth/accounts.js` — a JSON pair of the normalized
+  server URL and the user id. Stable, filesystem-safe, and does not leak the server URL.
 - `meta.json`: `{ version: 1, host, username, userId, exportedAt, feedCount, app }`.
   `host` is the hostname of the Miniflux server only, never the full URL. No tokens, no
   Miniflux credentials.
@@ -83,7 +83,8 @@ touches the active account's Miniflux server.
   check until the repository or the token changes.
 - The stored token is removed when the account is deleted (`cleanupAccountData`).
 - The token is kept in memory for the session by default. Persisting it to
-  `localStorage` is an explicit "remember token" checkbox; the UI names the XSS risk.
+  `localStorage` requires the explicit "remember token" checkbox; anything stored
+  there can be read by any script running on the page.
 - Never write the token, Miniflux URL, or credentials to the repo. The GitHub
   configuration lives in its own per-account storage key
   (`accountStorageKey(account, "githubBackup:v1")`), outside the Nextflux settings

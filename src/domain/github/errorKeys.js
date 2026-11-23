@@ -26,6 +26,8 @@ export function githubErrorKey(error) {
       return "missingToken";
     case "invalidRepo":
       return "invalidRepo";
+    case "invalidExport":
+      return "invalidExport";
     case "versionMissing":
       return "notFound";
     case "offline":

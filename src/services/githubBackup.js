@@ -20,6 +20,10 @@ import { buildBackupPaths, getBackupConfig } from "./githubBackupConfig.js";
 
 export { GitHubError };
 
+// A Miniflux export is an OPML document. Anything else (an empty body, an
+// HTML error page) is a failed export, not a subscription list with no feeds.
+const OPML_DOCUMENT = /<opml\b[^>]*>[\s\S]*<\/opml>/i;
+
 export const missingFeedApi = () => {
   throw new GitHubError(0, "missingFeedApi");
 };
@@ -53,6 +57,9 @@ export async function backupAccount(account, { config, client, feeds } = {}) {
   const { opmlPath, metaPath } = await resolvePaths(account, settings);
 
   const opml = await exportOPML();
+  if (typeof opml !== "string" || !OPML_DOCUMENT.test(opml)) {
+    throw new GitHubError(0, "invalidExport");
+  }
   const parsed = parseOPML(opml);
   const meta = buildBackupMeta({
     account,
@@ -106,11 +113,18 @@ export async function backupAccount(account, { config, client, feeds } = {}) {
 /**
  * List the backup versions stored in the repository.
  */
-export async function listBackupVersions(account, { config, client } = {}) {
+export async function listBackupVersions(
+  account,
+  { config, client, page = 1, perPage = 20 } = {},
+) {
   const settings = requireConfig(config || getBackupConfig(account));
   const github = client || new GitHubClient({ token: settings.token });
   const { opmlPath } = await resolvePaths(account, settings);
-  return github.listCommits(settings.repo, opmlPath, { branch: settings.branch });
+  return github.listCommits(settings.repo, opmlPath, {
+    branch: settings.branch,
+    page,
+    perPage,
+  });
 }
 
 /**

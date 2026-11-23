@@ -310,7 +310,7 @@ export default {
           "Keep a copy of your subscriptions in a GitHub repository and restore an earlier version when you need it.",
         repo: "Repository",
         repoHint:
-          "owner/repository of a private repository you have write access to.",
+          "owner/repository of a repository you have write access to. A private repository is recommended.",
         branch: "Branch",
         pathPrefix: "Folder",
         token: "Fine-grained access token",
@@ -326,6 +326,7 @@ export default {
         restore: "Restore",
         versionsTitle: "Backup versions",
         noVersions: "No backup versions yet",
+        loadMore: "Load more",
         previewTitle: "Restore preview",
         previewSummary:
           "{{added}} feeds will be added, {{present}} are already subscribed.",
@@ -342,6 +343,7 @@ export default {
         missingRepo: "Enter a repository first",
         missingToken: "Enter an access token first",
         invalidRepo: "The repository name is not valid",
+        invalidExport: "The subscription export could not be read",
         offline: "No connection to GitHub, please try again",
         unknown: "The GitHub request failed, please try again",
       },

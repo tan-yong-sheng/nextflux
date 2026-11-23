@@ -14,6 +14,7 @@ test("maps error codes to translation keys", () => {
   assert.equal(githubErrorKey({ code: "missingRepo" }), "missingRepo");
   assert.equal(githubErrorKey({ code: "missingToken" }), "missingToken");
   assert.equal(githubErrorKey({ code: "invalidRepo" }), "invalidRepo");
+  assert.equal(githubErrorKey({ code: "invalidExport" }), "invalidExport");
   assert.equal(githubErrorKey({ code: "versionMissing" }), "notFound");
   assert.equal(githubErrorKey({ code: "offline" }), "offline");
 });
