@@ -119,11 +119,15 @@ export async function unsubscribeFromPush() {
     return "unsubscribed";
   }
 
-  // Keep the browser subscription until the server forgets it, so a failed
-  // unregister leaves both sides consistent.
-  await postJson(UNSUBSCRIBE_PATH, { endpoint: subscription.endpoint });
-  await subscription.unsubscribe();
-  activeSubscription = null;
+  // Drop the browser subscription even when the server call fails: the switch
+  // must stop pushes now, and a leftover server record is pruned once a push
+  // reaches a dead endpoint. The caller reports the failure to the reader.
+  try {
+    await postJson(UNSUBSCRIBE_PATH, { endpoint: subscription.endpoint });
+  } finally {
+    await subscription.unsubscribe();
+    activeSubscription = null;
+  }
   return "unsubscribed";
 }
 
