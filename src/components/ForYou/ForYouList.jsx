@@ -159,6 +159,12 @@ export default function ForYouList() {
       if (merged.has(id)) continue;
       const fresh = latest.get(id);
       if (!fresh || !visibleFeedIds.has(fresh.feedId)) continue;
+      // Keep an article that is still unread even if it dropped out of the
+      // ranking, and keep the one being read, which the reader can still
+      // navigate to. Anything else is dropped so the list does not fill up
+      // with rows the reader already went past.
+      const isActive = String(fresh.id) === String(articleId);
+      if (fresh.status !== "unread" && !isActive) continue;
       merged.set(id, { ...item, article: fresh });
     }
     rankedRef.current = merged;
@@ -173,7 +179,7 @@ export default function ForYouList() {
       .slice(0, 50);
     setItems(ordered);
     setHasSignal(Boolean(signals.hasSignal));
-  }, [articles, starred, read, visibleFeedIds, isLoading]);
+  }, [articles, starred, read, visibleFeedIds, isLoading, articleId]);
 
   // Keep the shared list in sync so keyboard navigation and the reader panel
   // follow the ranked order instead of the feed order.
