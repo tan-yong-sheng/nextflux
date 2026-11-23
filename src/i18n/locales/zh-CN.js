@@ -304,7 +304,7 @@ export default {
       sync1hour: "每 1 小时",
       notifyNewArticles: "新文章通知",
       notifyNewArticlesDescription:
-        "在 Nextflux 打开时发送通知。暂不支持应用关闭后的推送。",
+        "在收到新文章时发送通知，即使 Nextflux 已关闭。在手机上，请先将 Nextflux 添加到主屏幕。",
       notifyDenied: "通知权限已被拒绝，请在浏览器或系统设置中允许 Nextflux 发送通知。",
       notifyUnsupported: "当前浏览器不支持通知。",
       feeds: "订阅",

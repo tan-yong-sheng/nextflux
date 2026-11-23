@@ -313,7 +313,7 @@ export default {
       sync1hour: "Toutes les heures",
       notifyNewArticles: "Notifications de nouveaux articles",
       notifyNewArticlesDescription:
-        "Notifier lorsque Nextflux est ouvert. Les notifications lorsque l’application est fermée ne sont pas encore prises en charge.",
+        "Notifier à l'arrivée de nouveaux articles, même lorsque Nextflux est fermé. Sur un téléphone, ajoutez d'abord Nextflux à l'écran d'accueil.",
       notifyDenied:
         "L'autorisation de notification a été refusée. Autorisez les notifications pour Nextflux dans les réglages du navigateur ou du système.",
       notifyUnsupported: "Ce navigateur ne prend pas en charge les notifications.",

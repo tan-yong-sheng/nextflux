@@ -16,6 +16,7 @@ import {
   notificationPermission,
   showNewArticles,
 } from "@/services/notificationService.js";
+import { hasActivePushSubscription } from "@/services/pushService.js";
 
 import { sessionAccount } from "@/stores/authStore.js";
 import { accountStorageKey } from "@/domain/auth/accounts.js";
@@ -84,12 +85,16 @@ export function sync() {
   error.set(null);
   syncProgress.set({ phase: "loading", received: 0 });
   const settings = settingsState.get();
-  const runAllowsNotice = notificationRunEnabled({
-    enabled: settings.notifyNewArticles,
-    permission: notificationPermission(),
-    hadPreviousSync: Boolean(getLastSyncTime()),
-    historyComplete: isHistorySyncComplete(),
-  });
+  // A device with a push subscription is notified by the server, so the sync run
+  // stays quiet to avoid announcing the same articles twice.
+  const runAllowsNotice =
+    !hasActivePushSubscription() &&
+    notificationRunEnabled({
+      enabled: settings.notifyNewArticles,
+      permission: notificationPermission(),
+      hadPreviousSync: Boolean(getLastSyncTime()),
+      historyComplete: isHistorySyncComplete(),
+    });
   const newArticles = [];
   const synchronize = async () => {
     signal.throwIfAborted();

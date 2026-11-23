@@ -310,7 +310,7 @@ export default {
       sync1hour: "Her saat",
       notifyNewArticles: "Yeni makale bildirimleri",
       notifyNewArticlesDescription:
-        "Nextflux açıkken bildir. Uygulama kapalıyken bildirim henüz desteklenmiyor.",
+        "Yeni makaleler geldiğinde, Nextflux kapalıyken bile bildir. Telefonda önce Nextflux'i ana ekrana ekleyin.",
       notifyDenied:
         "Bildirim izni reddedildi. Tarayıcı veya sistem ayarlarından Nextflux için bildirimlere izin verin.",
       notifyUnsupported: "Bu tarayıcı bildirimleri desteklemiyor.",

@@ -25,6 +25,7 @@ import {
   requestNotificationPermission,
   supportsNotifications,
 } from "@/services/notificationService";
+import { syncPushState } from "@/services/pushService";
 import { toast } from "sonner";
 export default function General() {
   const {
@@ -41,6 +42,7 @@ export default function General() {
   const toggleNotifications = async (checked) => {
     if (!checked) {
       updateSettings({ notifyNewArticles: false });
+      await syncPushState(false);
       return;
     }
     if (!supportsNotifications()) {
@@ -54,6 +56,8 @@ export default function General() {
     }
     if (permission !== "granted") return;
     updateSettings({ notifyNewArticles: true });
+    // Self-hosted builds have no push endpoint; the in-app notice still works.
+    await syncPushState(true);
   };
   return (
     <>
