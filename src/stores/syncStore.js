@@ -19,6 +19,7 @@ import {
 import {
   awaitPushRegistration,
   hasActivePushSubscription,
+  syncPushHiddenFeeds,
 } from "@/services/pushService.js";
 
 import { sessionAccount } from "@/stores/authStore.js";
@@ -119,6 +120,11 @@ export function sync() {
     lastSync.set(result);
     failures = 0;
     retryAfter = 0;
+    // The server filters pushed notices with the hidden feeds this device
+    // reported, so the record has to follow the current visibility.
+    if (hasActivePushSubscription()) {
+      void syncPushHiddenFeeds();
+    }
     if (runAllowsNotice) {
       const candidates = mergeNoticeCandidates(
         pendingNoticeArticles.get(),

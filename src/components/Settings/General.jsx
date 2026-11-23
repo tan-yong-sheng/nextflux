@@ -62,7 +62,12 @@ export default function General() {
     updateSettings({ notifyNewArticles: true });
     // Self-hosted builds have no push endpoint; the sync-driven system
     // notification still covers the case where the app's tab is visible.
-    await syncPushState(true);
+    const result = await syncPushState(true);
+    // A hosted build can refuse the subscription, so the reader has to know
+    // that the switch is on without any background push behind it.
+    if (result === "failed" || result === "unconfigured") {
+      toast.error(t("settings.general.notifyEnableFailed"));
+    }
   };
   return (
     <>

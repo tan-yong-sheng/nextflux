@@ -306,6 +306,7 @@ export default {
       notifyNewArticlesDescription:
         "新文章到达时发送系统通知。需要此部署已配置 Web Push；在 iPhone 和 iPad 上，请先将 Nextflux 添加到主屏幕。",
       notifyDisableFailed: "无法在服务器上关闭通知，请重试。",
+      notifyEnableFailed: "无法在服务器上开启通知，请重试。",
       notifyDenied: "通知权限已被拒绝，请在浏览器或系统设置中允许 Nextflux 发送通知。",
       notifyUnsupported: "当前浏览器不支持通知。",
       feeds: "订阅",
