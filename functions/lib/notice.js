@@ -22,9 +22,9 @@ export function buildNewEntriesNotice(
   if (!payload || payload.event_type !== "new_entries") return null;
   // Feeds the reader hid globally must stay silent, exactly like the in-app
   // notice does. The client sends the hidden feed ids with the subscription
-  // because the webhook payload does not carry them.
+  // because the webhook payload does not carry them. The filter is per entry:
+  // a webhook's feed id is not guaranteed to match the entry's feed_id.
   const hidden = new Set(hiddenFeedIds.map((id) => Number(id)));
-  if (hidden.has(Number(payload?.feed?.id))) return null;
   const entries = Array.isArray(payload.entries) ? payload.entries : [];
   const unread = entries.filter(
     (entry) =>

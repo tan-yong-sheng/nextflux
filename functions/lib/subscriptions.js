@@ -73,10 +73,12 @@ export function normalizeHiddenFeedIds(value) {
   if (!Array.isArray(value)) return [];
   const ids = new Set();
   for (const id of value) {
-    const parsed = Number(id);
+    // Number() would turn null, "" and false into 0 and true into 1, so only
+    // integers and digit strings count.
+    const parsed = typeof id === "string" && /^\d+$/.test(id) ? Number(id) : id;
     if (Number.isInteger(parsed) && parsed >= 0) ids.add(parsed);
   }
-  return [...ids].slice(0, 500);
+  return [...ids];
 }
 
 export function subscriptionsPrefix(userId) {

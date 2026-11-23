@@ -164,3 +164,15 @@ test("saveSubscription keeps the hidden feeds of the device", async () => {
   const listed = await listSubscriptions(env, 1);
   assert.deepEqual(listed[0].hiddenFeedIds, [7, 9]);
 });
+
+test("normalizeHiddenFeedIds accepts only integers and digit strings", async () => {
+  const { normalizeHiddenFeedIds } = await import("../../functions/lib/subscriptions.js");
+  assert.deepEqual(normalizeHiddenFeedIds([7, "9", true, false, null, "", -1, 1.5, "x"]), [7, 9]);
+  assert.deepEqual(normalizeHiddenFeedIds("7"), []);
+});
+
+test("normalizeHiddenFeedIds keeps every valid id", async () => {
+  const { normalizeHiddenFeedIds } = await import("../../functions/lib/subscriptions.js");
+  const ids = Array.from({ length: 700 }, (_, index) => index + 1);
+  assert.equal(normalizeHiddenFeedIds(ids).length, 700);
+});

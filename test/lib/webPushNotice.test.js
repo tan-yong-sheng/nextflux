@@ -83,3 +83,15 @@ test("buildNewEntriesNotice returns nothing when the feed itself is hidden", () 
   );
   assert.equal(notice, null);
 });
+
+test("buildNewEntriesNotice keeps visible entries when the webhook feed id differs", () => {
+  const notice = buildNewEntriesNotice(
+    {
+      event_type: "new_entries",
+      feed: { id: 7 },
+      entries: [entry(1, { feed_id: 5 })],
+    },
+    { hiddenFeedIds: [7] },
+  );
+  assert.deepEqual(notice, { count: 1, titles: ["Entry 1"], url: "/" });
+});
