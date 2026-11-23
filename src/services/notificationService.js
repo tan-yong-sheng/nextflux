@@ -1,5 +1,4 @@
 import i18n from "@/i18n";
-import { toast } from "sonner";
 
 export function supportsNotifications() {
   return typeof window !== "undefined" && "Notification" in window;
@@ -20,16 +19,12 @@ export async function requestNotificationPermission() {
 }
 
 /**
- * Show the collected new-article notice. A visible tab gets an in-app toast;
- * a hidden one gets a system notification that reopens the app on click.
+ * Show the collected new-article notice as a system notification that reopens
+ * the app on click.
  */
 export async function showNewArticles(notice) {
   const title = i18n.t("notifications.newArticles", { count: notice.count });
   const body = notice.titles.join(" · ");
-  if (document.visibilityState === "visible") {
-    toast(title, { description: body });
-    return;
-  }
   const options = {
     body,
     icon: "/icon-192x192.png",

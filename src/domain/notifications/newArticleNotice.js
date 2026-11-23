@@ -1,4 +1,4 @@
-// Pure rules for the in-app new-article notification, kept out of browser code.
+// Pure rules for the new-article notification, kept out of browser code.
 export const NOTICE_TITLE_LIMIT = 3;
 
 /**
