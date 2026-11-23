@@ -59,3 +59,27 @@ test("buildNewEntriesNotice drops entries without a usable title", () => {
   assert.equal(notice.count, 3);
   assert.deepEqual(notice.titles, ["Entry 3"]);
 });
+
+test("buildNewEntriesNotice leaves out the feeds the device hides", () => {
+  const notice = buildNewEntriesNotice(
+    {
+      event_type: "new_entries",
+      feed: { id: 9 },
+      entries: [entry(1, { feed_id: 7 }), entry(2, { feed_id: 9 })],
+    },
+    { hiddenFeedIds: [7] },
+  );
+  assert.deepEqual(notice, { count: 1, titles: ["Entry 2"], url: "/" });
+});
+
+test("buildNewEntriesNotice returns nothing when the feed itself is hidden", () => {
+  const notice = buildNewEntriesNotice(
+    {
+      event_type: "new_entries",
+      feed: { id: 7 },
+      entries: [entry(1, { feed_id: 7 })],
+    },
+    { hiddenFeedIds: [7] },
+  );
+  assert.equal(notice, null);
+});

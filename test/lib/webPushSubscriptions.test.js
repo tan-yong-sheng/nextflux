@@ -157,3 +157,10 @@ test("subscriptionKey is stable per user and endpoint", async () => {
   assert.notEqual(keyA, await subscriptionKey(1, "https://fcm.googleapis.com/fcm/send/other"));
   assert.ok(keyA.startsWith(subscriptionsPrefix(1)));
 });
+
+test("saveSubscription keeps the hidden feeds of the device", async () => {
+  const env = createEnv();
+  await saveSubscription(env, 1, subscription(), [7, 9, "x", -1]);
+  const listed = await listSubscriptions(env, 1);
+  assert.deepEqual(listed[0].hiddenFeedIds, [7, 9]);
+});

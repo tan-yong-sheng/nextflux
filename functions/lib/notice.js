@@ -15,10 +15,22 @@ function cleanTitle(value) {
     : title;
 }
 
-export function buildNewEntriesNotice(payload, { maxTitles = NOTICE_TITLE_LIMIT } = {}) {
+export function buildNewEntriesNotice(
+  payload,
+  { maxTitles = NOTICE_TITLE_LIMIT, hiddenFeedIds = [] } = {},
+) {
   if (!payload || payload.event_type !== "new_entries") return null;
+  // Feeds the reader hid globally must stay silent, exactly like the in-app
+  // notice does. The client sends the hidden feed ids with the subscription
+  // because the webhook payload does not carry them.
+  const hidden = new Set(hiddenFeedIds.map((id) => Number(id)));
+  if (hidden.has(Number(payload?.feed?.id))) return null;
   const entries = Array.isArray(payload.entries) ? payload.entries : [];
-  const unread = entries.filter((entry) => !entry?.status || entry.status === "unread");
+  const unread = entries.filter(
+    (entry) =>
+      (!entry?.status || entry.status === "unread") &&
+      !hidden.has(Number(entry?.feed_id)),
+  );
   if (unread.length === 0) return null;
 
   return {

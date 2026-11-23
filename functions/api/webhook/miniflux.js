@@ -34,11 +34,21 @@ export async function onRequestPost({ request, env }) {
   const subscriptions = await listSubscriptions(env, userId);
   if (subscriptions.length === 0) return json({ ok: true, sent: 0 });
 
+  // Every device reports the feeds it hides globally, so the notice for that
+  // device leaves the entries of those feeds out.
   const results = await Promise.all(
-    subscriptions.map(async (subscription) => ({
-      subscription,
-      outcome: await deliverPush(env, subscription, notice),
-    })),
+    subscriptions.map(async (subscription) => {
+      const deviceNotice = buildNewEntriesNotice(payload, {
+        hiddenFeedIds: subscription.hiddenFeedIds ?? [],
+      });
+      // Every entry of this refresh is from a feed the device hides, so this
+      // device stays silent.
+      if (!deviceNotice) return { subscription, outcome: "skipped" };
+      return {
+        subscription,
+        outcome: await deliverPush(env, subscription, deviceNotice),
+      };
+    }),
   );
 
   const gone = results

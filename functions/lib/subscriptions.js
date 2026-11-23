@@ -66,6 +66,19 @@ export function normalizeSubscription(value) {
   };
 }
 
+// The reader hides some feeds globally. The webhook payload does not say
+// which feeds are hidden, so every device reports its own hidden feed ids and
+// the notice skips the entries of those feeds.
+export function normalizeHiddenFeedIds(value) {
+  if (!Array.isArray(value)) return [];
+  const ids = new Set();
+  for (const id of value) {
+    const parsed = Number(id);
+    if (Number.isInteger(parsed) && parsed >= 0) ids.add(parsed);
+  }
+  return [...ids].slice(0, 500);
+}
+
 export function subscriptionsPrefix(userId) {
   return `${STORAGE_PREFIX}:${userId}:`;
 }
@@ -105,7 +118,7 @@ export async function listSubscriptions(env, userId) {
   return records.filter(Boolean).slice(-MAX_SUBSCRIPTIONS);
 }
 
-export async function saveSubscription(env, userId, subscription) {
+export async function saveSubscription(env, userId, subscription, hiddenFeedIds = []) {
   const key = await subscriptionKey(userId, subscription.endpoint);
   const existing = await listSubscriptions(env, userId);
   const replaces = existing.some((item) => item.endpoint === subscription.endpoint);
@@ -124,7 +137,11 @@ export async function saveSubscription(env, userId, subscription) {
 
   await env.NEXTFLUX_PUSH.put(
     key,
-    JSON.stringify({ ...subscription, savedAt: Date.now() }),
+    JSON.stringify({
+      ...subscription,
+      hiddenFeedIds: normalizeHiddenFeedIds(hiddenFeedIds),
+      savedAt: Date.now(),
+    }),
   );
 }
 
