@@ -37,7 +37,12 @@ export function PrototypeSwitcher({ current, onChange }) {
   const cycle = useCallback(
     (direction) => {
       if (index === -1) {
-        onChange(PROTOTYPE_VARIANTS[0].key);
+        // Off state: → enters at the first variant, ← at the last one.
+        onChange(
+          PROTOTYPE_VARIANTS[
+            direction < 0 ? PROTOTYPE_VARIANTS.length - 1 : 0
+          ].key,
+        );
         return;
       }
       const next =
@@ -54,12 +59,16 @@ export function PrototypeSwitcher({ current, onChange }) {
     if (import.meta.env.PROD || index === -1) return;
     const onKey = (event) => {
       if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+      // Never steal a shortcut (⌘/Ctrl/Alt/Shift + arrow) or an arrow that a
+      // focused control uses for its own navigation.
+      if (event.metaKey || event.ctrlKey || event.altKey || event.shiftKey)
+        return;
       const target = event.target;
       if (
         target instanceof HTMLElement &&
-        (target.tagName === "INPUT" ||
-          target.tagName === "TEXTAREA" ||
-          target.isContentEditable)
+        target.closest(
+          "input, textarea, select, button, a, [contenteditable='true'], [role='button']",
+        )
       )
         return;
       event.preventDefault();
@@ -72,7 +81,8 @@ export function PrototypeSwitcher({ current, onChange }) {
   if (import.meta.env.PROD) return null;
 
   return (
-    <div className="fixed bottom-4 left-1/2 z-50 -translate-x-1/2">
+    // Cleared of the footer filter tabs, which sit in the same spot.
+    <div className="fixed bottom-20 left-1/2 z-50 -translate-x-1/2">
       <div className="flex items-center gap-1 rounded-full border border-white/20 bg-neutral-900/95 px-2 py-1 text-neutral-100 shadow-2xl">
         <button
           type="button"

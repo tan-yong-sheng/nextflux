@@ -4,18 +4,7 @@ import { useLiveQuery } from "dexie-react-hooks";
 import { useStore } from "@nanostores/react";
 import { db } from "@/db/database.js";
 import { settingsState } from "@/stores/settingsStore.js";
-
-const IDLE_DAYS = 21;
-const BACKLOG = 25;
-const DAY = 86400000;
-
-// Dexie stores published_at/created_at as Miniflux's RFC3339 strings; demo
-// data uses epoch ms. Normalize both to ms.
-const toMs = (value) => {
-  if (typeof value === "number") return value;
-  const parsed = Date.parse(value);
-  return Number.isNaN(parsed) ? 0 : parsed;
-};
+import { BACKLOG_UNREAD, DAY, QUIET_DAYS, toMs } from "./insights/signals.js";
 
 export function useFeedInsights() {
   const { showHiddenFeeds } = useStore(settingsState);
@@ -60,16 +49,15 @@ export function useFeedInsights() {
       };
     });
 
+    // Quiet is quiet whether or not unread piled up — the whole point is to
+    // spot feeds the user can drop.
     const lowActivity = signals
-      .filter(
-        (s) =>
-          s.unread > 0 && (s.daysIdle === null || s.daysIdle >= IDLE_DAYS),
-      )
+      .filter((s) => s.daysIdle === null || s.daysIdle >= QUIET_DAYS)
       .sort(
         (a, b) => (b.daysIdle ?? Infinity) - (a.daysIdle ?? Infinity),
       );
     const backlog = signals
-      .filter((s) => s.unread >= BACKLOG)
+      .filter((s) => s.unread >= BACKLOG_UNREAD)
       .sort((a, b) => b.unread - a.unread);
     const broken = signals
       .filter((s) => s.parsingErrorCount > 0)

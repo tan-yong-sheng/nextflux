@@ -24,16 +24,31 @@ globalThis.location = {
   search: "",
   href: "http://localhost/",
 };
-globalThis.document = {
-  createElement: () => ({
-    innerHTML: "",
+// Anything rendered through innerHTML is captured here instead of thrown away,
+// so titles written that way still show up in the output.
+const capturedHtml = [];
+const createElement = () => {
+  const element = {
+    _html: "",
     style: {},
     classList: { add() {}, remove() {}, toggle() {}, contains: () => false },
     querySelector: () => null,
     querySelectorAll: () => [],
     appendChild() {},
     setAttribute() {},
-  }),
+  };
+  Object.defineProperty(element, "innerHTML", {
+    get: () => element._html,
+    set: (value) => {
+      element._html = String(value ?? "");
+      capturedHtml.push(element._html);
+    },
+  });
+  return element;
+};
+globalThis.document = {
+  createElement,
+  createElementNS: createElement,
   querySelector: () => null,
   querySelectorAll: () => [],
   getElementsByTagName: () => [],
@@ -83,10 +98,18 @@ const html = renderToStaticMarkup(
       "div",
       null,
       React.createElement(SidebarCleanup, { insights, demo: true }),
-      React.createElement(ForYouView, { insights, articles: DEMO_ARTICLES }),
-      React.createElement(PersonalizedView, { insights }),
+      React.createElement(ForYouView, {
+        insights,
+        articles: DEMO_ARTICLES,
+        feeds: DEMO_FEEDS,
+        demo: true,
+      }),
+      React.createElement(PersonalizedView, { insights, demo: true }),
     ),
   ),
 );
 
 console.log(html);
+if (capturedHtml.length) {
+  console.log("<!-- innerHTML captured -->", capturedHtml.join(""));
+}

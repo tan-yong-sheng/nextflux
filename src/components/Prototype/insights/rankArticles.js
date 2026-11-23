@@ -1,64 +1,46 @@
 // PROTOTYPE — throwaway. Ranks unread articles by affinity to what the user
-// actually reads (starred articles + feeds read most). Deterministic, no model.
-
-const STOP_WORDS = new Set([
-  "the", "and", "for", "that", "with", "this", "from", "you", "your", "are",
-  "was", "how", "why", "what", "when", "who", "not", "but", "can", "will",
-  "its", "it", "a", "an", "of", "to", "in", "on", "is", "as", "at", "by",
-  "be", "we", "our", "new", "more", "has", "have", "had", "or", "if", "so",
-]);
-
-const tokenize = (text) =>
-  (text || "")
-    .toLowerCase()
-    .replace(/[^a-z0-9\s]/g, " ")
-    .split(/\s+/)
-    .filter((word) => word.length > 3 && !STOP_WORDS.has(word));
+// actually reads (starred article titles + feeds read most). Deterministic,
+// no model, no network.
+import { toMs, tokenize } from "./signals.js";
 
 /**
  * @param {Array} articles  all local articles
- * @param {Object} insights  output of collectInsights()
- * @returns {Array} unread articles with a `score` and `reasons`
+ * @param {Object} insights output of collectInsights()
+ * @returns {Array} unread articles, best first, each with `reasons`
  */
 export function rankForYou(articles, insights) {
-  // Affinity terms come from starred article titles.
-  const affinity = new Map();
-  for (const article of articles) {
-    if (article.starred !== 1) continue;
-    for (const word of tokenize(article.title)) {
-      affinity.set(word, (affinity.get(word) || 0) + 2);
-    }
-  }
-  // Feeds the user reads a lot are, on their own, a decent signal.
-  const feedAffinity = new Map(
-    insights.coreFeeds.map((feed) => [feed.id, feed.starred / (feed.total || 1)]),
+  const topics = new Map(
+    (insights.topics || []).map(({ term, count }) => [term, count]),
   );
+  // "Reads a lot of it" is a read-count signal, not a star rate: a feed you
+  // read every day but rarely star should still rank up.
+  const reads = new Map(
+    (insights.coreFeeds || []).map((feed) => [feed.id, feed.read || 0]),
+  );
+  const maxReads = Math.max(1, ...reads.values());
 
   return articles
-    .filter((article) => article.status === "unread")
+    // Starred items are already saved; For You should surface what's new.
+    .filter((article) => article.status === "unread" && article.starred !== 1)
     .map((article) => {
-      const words = tokenize(article.title);
-      let score = 0;
-      const reasons = [];
-      for (const word of new Set(words)) {
-        const hit = affinity.get(word);
-        if (hit) {
-          score += hit;
-          reasons.push(word);
-        }
-      }
-      const feedBoost = feedAffinity.get(article.feedId);
-      if (feedBoost !== undefined) {
-        // Feeds you read often surface even with no starred-title overlap.
-        score += Math.max(feedBoost * 3, 0.5);
-        reasons.push("from a feed you read often");
-      }
+      const terms = [...new Set(tokenize(article.title))];
+      const hits = terms.filter((term) => topics.has(term));
+      const topicScore =
+        hits.reduce((sum, term) => sum + topics.get(term), 0) * 1.5;
+      const feedReads = reads.get(article.feedId);
+      const feedScore =
+        feedReads === undefined ? 0 : (feedReads / maxReads) * 3 + 0.5;
+
       return {
         ...article,
-        score,
-        reasons: [...new Set(reasons)].slice(0, 3),
+        score: topicScore + feedScore,
+        reasons: [
+          ...hits.slice(0, 3).map((term) => `#${term}`),
+          ...(feedScore > 0 ? ["often read"] : []),
+        ],
+        sortedAt: toMs(article.published_at) || toMs(article.created_at),
       };
     })
     .filter((article) => article.score > 0)
-    .sort((a, b) => b.score - a.score);
+    .sort((a, b) => b.score - a.score || b.sortedAt - a.sortedAt);
 }

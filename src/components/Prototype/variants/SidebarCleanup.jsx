@@ -11,19 +11,21 @@ import {
 } from "@/stores/modalStore.js";
 
 const REASON = {
-  idle: (s) => `quiet for ${s.daysIdle ?? "a while"} days`,
+  idle: (s) =>
+    s.daysIdle === null ? "no new items" : `quiet for ${s.daysIdle} days`,
   backlog: (s) => `${s.unread} unread piling up`,
 };
 
 export default function SidebarCleanup({ insights, demo = false }) {
-  // A feed can qualify as both "quiet" and "backlog" — list it once.
+  // Each source gets its own slice, so a long quiet list can't crowd out the
+  // backlog list. A feed qualifying for both is still listed once.
   const candidates = [
     ...new Map(
       [
-        ...insights.lowActivity
-          .filter((s) => s.unread > 0)
-          .slice(0, 5)
-          .map((s) => ({ feed: s, reason: REASON.idle(s) })),
+        ...insights.lowActivity.slice(0, 3).map((s) => ({
+          feed: s,
+          reason: REASON.idle(s),
+        })),
         ...insights.backlog.slice(0, 3).map((s) => ({
           feed: s,
           reason: REASON.backlog(s),

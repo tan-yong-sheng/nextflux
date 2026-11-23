@@ -5,7 +5,7 @@ import { filter } from "@/stores/articlesStore";
 import { Circle, Star, Text } from "lucide-react";
 import { useStore } from "@nanostores/react";
 import { useTranslation } from "react-i18next";
-export default function ArticleListFooter() {
+export default function ArticleListFooter({ showFilter = true }) {
   const { t } = useTranslation();
   const $filter = useStore(filter);
   return (
@@ -14,13 +14,16 @@ export default function ArticleListFooter() {
         ref={audioDock.set}
         className="absolute inset-x-0 bottom-full mb-3"
       />
-      <Tabs
-        aria-label="filter"
-        value={$filter}
-        onValueChange={(value) => {
-          filter.set(value);
-        }}
-      >
+      {/* The prototype variants replace the list, so the filter tabs would do
+          nothing visible — hide them and keep the audio dock. */}
+      {showFilter && (
+        <Tabs
+          aria-label="filter"
+          value={$filter}
+          onValueChange={(value) => {
+            filter.set(value);
+          }}
+        >
         <LiquidGlass>
           <TabsList
             variant="pill"
@@ -46,8 +49,9 @@ export default function ArticleListFooter() {
               </div>
             </TabsTrigger>
           </TabsList>
-        </LiquidGlass>
-      </Tabs>
+          </LiquidGlass>
+        </Tabs>
+      )}
     </div>
   );
 }

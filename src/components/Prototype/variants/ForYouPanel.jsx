@@ -1,6 +1,7 @@
 // PROTOTYPE — throwaway. Variant B: a "For You" filter on the existing
 // article list, ranked deterministically from local signals.
 import { useMemo } from "react";
+import { useParams } from "react-router-dom";
 import { Sparkles } from "lucide-react";
 import { rankForYou } from "../insights/rankArticles.js";
 import ArticleCard from "@/components/ArticleList/components/ArticleCard.jsx";
@@ -8,7 +9,23 @@ import { usePersonalizationData } from "../usePersonalizationData.js";
 
 // Container: owns the Dexie read, so it only mounts while variant B is on.
 export default function ForYouPanel() {
-  const { loading, insights, articles } = usePersonalizationData();
+  const { loading, insights, articles, feeds } = usePersonalizationData();
+  const { feedId, categoryId } = useParams();
+  // Stay inside the route's scope — a feed page must not recommend other
+  // feeds' articles, or the header label becomes a lie.
+  const scoped = useMemo(() => {
+    if (feedId) return articles.filter((a) => a.feedId === Number(feedId));
+    if (categoryId) {
+      const ids = new Set(
+        feeds
+          .filter((feed) => String(feed.categoryId) === categoryId)
+          .map((feed) => feed.id),
+      );
+      return articles.filter((a) => ids.has(a.feedId));
+    }
+    return articles;
+  }, [articles, feeds, feedId, categoryId]);
+
   if (loading || !insights) {
     return (
       <div className="min-h-0 flex-1 overflow-y-auto px-6 py-16 text-center text-sm text-muted-foreground">
@@ -16,7 +33,7 @@ export default function ForYouPanel() {
       </div>
     );
   }
-  return <ForYouView insights={insights} articles={articles} />;
+  return <ForYouView insights={insights} articles={scoped} feeds={feeds} />;
 }
 
 // Presentational half — reused by /prototype with demo data. `demo` renders
@@ -39,7 +56,10 @@ export function ForYouView({ insights, articles, demo = false, feeds = [] }) {
   }
 
   return (
-    <div className="mx-auto min-h-0 w-full max-w-[560px] flex-1 overflow-y-auto px-2">
+    <div
+      data-slot="scroll-area-viewport"
+      className="mx-auto min-h-0 w-full max-w-[560px] flex-1 overflow-y-auto px-2"
+    >
       <div className="flex items-center gap-2 px-2 py-3 text-xs text-muted-foreground">
         <Sparkles className="size-3.5" />
         Ranked from {insights.totals.starred} starred articles and the feeds

@@ -1,7 +1,7 @@
 // PROTOTYPE — throwaway. Variant C: one "Personalized" dashboard panel —
 // topics you read, feeds you under-use, and search made obvious.
 import { Link } from "react-router-dom";
-import { Search, Sparkles, TriangleAlert, Moon } from "lucide-react";
+import { Search, Sparkles, Star, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import FeedIcon from "@/components/ui/FeedIcon.jsx";
 import { searchDialogOpen } from "@/stores/modalStore.js";
@@ -20,12 +20,26 @@ export default function PersonalizedPanel() {
   return <PersonalizedView insights={insights} />;
 }
 
+// Demo mode (/prototype) passes fake feed ids — a real FeedIcon would request
+// /v1/feeds/{id}/icon and can show an unrelated cached icon.
+function FeedAvatar({ feed, demo }) {
+  if (!demo) return <FeedIcon feedId={feed.id} />;
+  return (
+    <span className="flex size-4 shrink-0 items-center justify-center rounded-sm bg-muted text-[9px] font-semibold uppercase text-muted-foreground">
+      {(feed.title || "?").trim().charAt(0)}
+    </span>
+  );
+}
+
 // Presentational half — reused by /prototype with demo data.
-export function PersonalizedView({ insights }) {
+export function PersonalizedView({ insights, demo = false }) {
   const { topics, lowActivity, broken, topStarredFeeds } = insights;
 
   return (
-    <div className="mx-auto min-h-0 w-full max-w-[720px] flex-1 space-y-6 overflow-y-auto px-4 py-6">
+    <div
+      data-slot="scroll-area-viewport"
+      className="mx-auto min-h-0 w-full max-w-[720px] flex-1 space-y-6 overflow-y-auto px-4 py-6"
+    >
       <section className="rounded-xl border border-border/60 bg-card/40 p-4">
         <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold">
           <Sparkles className="size-4" /> Your reading, summarised
@@ -72,7 +86,7 @@ export function PersonalizedView({ insights }) {
           <ul className="space-y-2">
             {lowActivity.slice(0, 6).map((feed) => (
               <li key={feed.id} className="flex items-center gap-2 text-sm">
-                <FeedIcon feedId={feed.id} />
+                <FeedAvatar feed={feed} demo={demo} />
                 <Link
                   to={`/feed/${feed.id}`}
                   className="min-w-0 flex-1 truncate"
@@ -102,7 +116,7 @@ export function PersonalizedView({ insights }) {
           <ul className="space-y-2">
             {broken.slice(0, 5).map((feed) => (
               <li key={feed.id} className="flex items-center gap-2 text-sm">
-                <FeedIcon feedId={feed.id} />
+                <FeedAvatar feed={feed} demo={demo} />
                 <span className="min-w-0 flex-1 truncate">{feed.title}</span>
                 <span className="text-[11px] text-muted-foreground">
                   {feed.parsingErrorCount} errors
@@ -128,13 +142,13 @@ export function PersonalizedView({ insights }) {
 
       <section className="rounded-xl border border-border/60 bg-card/40 p-4">
         <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold">
-          <Moon className="size-4" /> Most starred feeds
+          <Star className="size-4" /> Most starred feeds
         </h3>
         {topStarredFeeds.length ? (
           <ul className="space-y-2">
             {topStarredFeeds.map((feed) => (
               <li key={feed.id} className="flex items-center gap-2 text-sm">
-                <FeedIcon feedId={feed.id} />
+                <FeedAvatar feed={feed} demo={demo} />
                 <span className="min-w-0 flex-1 truncate">{feed.title}</span>
                 <span className="text-[11px] text-muted-foreground">
                   {feed.starred} starred

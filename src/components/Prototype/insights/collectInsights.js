@@ -1,29 +1,12 @@
 // PROTOTYPE — throwaway. Computes "personalized" signals from data the app
 // already has locally (Dexie). No network, no model, no persistence.
-
-const STOP_WORDS = new Set([
-  "the", "and", "for", "that", "with", "this", "from", "you", "your", "are",
-  "was", "how", "why", "what", "when", "who", "not", "but", "can", "will",
-  "its", "it", "a", "an", "of", "to", "in", "on", "is", "as", "at", "by",
-  "be", "we", "our", "new", "more", "has", "have", "had", "or", "if", "so",
-]);
-
-const DAY = 24 * 60 * 60 * 1000;
-
-// Dexie stores published_at/created_at as Miniflux's RFC3339 strings; demo
-// data uses epoch ms. Normalize both to ms — Math.max on a string yields NaN.
-const toMs = (value) => {
-  if (typeof value === "number") return value;
-  const parsed = Date.parse(value);
-  return Number.isNaN(parsed) ? 0 : parsed;
-};
-
-const tokenize = (text) =>
-  (text || "")
-    .toLowerCase()
-    .replace(/[^a-z0-9\s]/g, " ")
-    .split(/\s+/)
-    .filter((word) => word.length > 3 && !STOP_WORDS.has(word));
+import {
+  BACKLOG_UNREAD,
+  DAY,
+  QUIET_DAYS,
+  toMs,
+  tokenize,
+} from "./signals.js";
 
 /**
  * @param {{feeds: Array, articles: Array, now?: number}} input
@@ -80,13 +63,14 @@ export function collectInsights({ feeds = [], articles = [], now = Date.now() })
     return { ...stats, daysIdle };
   });
 
-  // "Low activity" = nothing new for 3+ weeks. "Backlog" = unread piling up.
+  // "Low activity" = nothing new for 3+ weeks, with or without unread — a
+  // feed that went silent is a cleanup candidate either way.
   const lowActivity = feedStats
-    .filter((s) => s.total > 0 && (s.daysIdle === null || s.daysIdle >= 21))
+    .filter((s) => s.total > 0 && (s.daysIdle === null || s.daysIdle >= QUIET_DAYS))
     .sort((a, b) => b.unread - a.unread || (b.daysIdle || 0) - (a.daysIdle || 0));
 
   const backlog = feedStats
-    .filter((s) => s.unread >= 25)
+    .filter((s) => s.unread >= BACKLOG_UNREAD)
     .sort((a, b) => b.unread - a.unread);
 
   const broken = feedStats
@@ -104,11 +88,12 @@ export function collectInsights({ feeds = [], articles = [], now = Date.now() })
     .slice(0, 12)
     .map(([term, count]) => ({ term, count }));
 
-  // The "maybe you want more of this" signal: feeds the user already reads a
-  // lot of. We have no feed catalog, so this can only re-rank what exists.
+  // The "maybe you want more of this" signal: feeds the user reads most.
+  // Ranked by read count, which is what this list claims to show. We have no
+  // feed catalog, so this can only re-rank what already exists.
   const coreFeeds = [...feedStats]
     .filter((s) => s.read >= 5)
-    .sort((a, b) => b.starred / (b.total || 1) - a.starred / (a.total || 1))
+    .sort((a, b) => b.read - a.read)
     .slice(0, 8);
 
   return {

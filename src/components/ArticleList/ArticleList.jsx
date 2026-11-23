@@ -147,7 +147,7 @@ const ArticleList = () => {
         )}
       >
         <ArticleListHeader />
-        {pendingCount > 0 && (
+        {!variant && pendingCount > 0 && (
           <div className="absolute top-16 inset-x-0 flex justify-center pointer-events-none z-10">
             <LiquidGlass className="pointer-events-auto">
               <Button
@@ -179,7 +179,7 @@ const ArticleList = () => {
             setVisibleRange={setVisibleRange}
           />
         )}
-        <ArticleListFooter />
+        <ArticleListFooter showFilter={!variant} />
         <PrototypeSwitcher current={variant} onChange={setVariant} />
       </div>
     </ReadingLayout>

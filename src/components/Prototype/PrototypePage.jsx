@@ -42,6 +42,8 @@ export default function PrototypePage() {
           {VIEWS.map((v) => (
             <button
               key={v.key}
+              type="button"
+              aria-pressed={view === v.key}
               onClick={() => setView(v.key)}
               className={
                 view === v.key
@@ -78,7 +80,7 @@ export default function PrototypePage() {
               />
             </div>
           )}
-          {view === "C" && <PersonalizedView insights={insights} />}
+          {view === "C" && <PersonalizedView insights={insights} demo />}
         </div>
 
         <details className="mt-6 rounded-xl border border-border/60 p-4 text-sm">

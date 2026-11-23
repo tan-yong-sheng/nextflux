@@ -24,11 +24,16 @@ export const router = createBrowserRouter(
       element: <LoginPage />,
       errorElement: <ErrorPage />,
     },
-    {
-      path: "/prototype",
-      element: <PrototypePage />,
-      errorElement: <ErrorPage />,
-    },
+    // Dev-only: the prototype pulls in demo data and throwaway surfaces.
+    ...(import.meta.env.DEV
+      ? [
+          {
+            path: "/prototype",
+            element: <PrototypePage />,
+            errorElement: <ErrorPage />,
+          },
+        ]
+      : []),
     {
       path: "/",
       element: (
