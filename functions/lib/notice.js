@@ -8,7 +8,11 @@ const TITLE_MAX_CHARS = 120;
 function cleanTitle(value) {
   if (typeof value !== "string") return "";
   const title = value.replace(/\s+/g, " ").trim();
-  return title.length > TITLE_MAX_CHARS ? `${title.slice(0, TITLE_MAX_CHARS - 1)}…` : title;
+  // Count and slice by code points so a cut never splits a surrogate pair.
+  const chars = Array.from(title);
+  return chars.length > TITLE_MAX_CHARS
+    ? `${chars.slice(0, TITLE_MAX_CHARS - 1).join("")}…`
+    : title;
 }
 
 export function buildNewEntriesNotice(payload, { maxTitles = NOTICE_TITLE_LIMIT } = {}) {

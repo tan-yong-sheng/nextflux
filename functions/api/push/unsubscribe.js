@@ -1,10 +1,6 @@
 import { json, readJson } from "../../lib/http.js";
 import { requireMinifluxUser } from "../../lib/auth.js";
-import {
-  readSubscriptions,
-  removeSubscription,
-  writeSubscriptions,
-} from "../../lib/subscriptions.js";
+import { deleteSubscription } from "../../lib/subscriptions.js";
 
 export async function onRequestPost({ request, env }) {
   const auth = await requireMinifluxUser(request, env);
@@ -15,9 +11,7 @@ export async function onRequestPost({ request, env }) {
     return json({ error: "missing_endpoint" }, { status: 400 });
   }
 
-  const current = await readSubscriptions(env);
-  const next = removeSubscription(current, body.endpoint);
-  if (next.length !== current.length) await writeSubscriptions(env, next);
+  await deleteSubscription(env, auth.user.id, body.endpoint);
 
-  return json({ ok: true, subscriptions: next.length });
+  return json({ ok: true });
 }

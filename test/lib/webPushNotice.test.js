@@ -39,6 +39,18 @@ test("buildNewEntriesNotice cleans and truncates titles", () => {
   assert.ok(notice.titles[1].endsWith("…"));
 });
 
+test("buildNewEntriesNotice truncates by code points, never splitting emoji", () => {
+  const notice = buildNewEntriesNotice({
+    event_type: "new_entries",
+    entries: [entry(1, { title: "🚀".repeat(200) })],
+  });
+  const chars = Array.from(notice.titles[0]);
+  assert.equal(chars.length, 120);
+  assert.equal(chars.at(-1), "…");
+  // Every kept character is a whole code point — no lone surrogates.
+  assert.equal(notice.titles[0].isWellFormed(), true);
+});
+
 test("buildNewEntriesNotice drops entries without a usable title", () => {
   const notice = buildNewEntriesNotice({
     event_type: "new_entries",

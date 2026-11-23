@@ -3,11 +3,12 @@ import { test } from "node:test";
 import { Buffer } from "node:buffer";
 import {
   decodeBase64Url,
+  deleteSubscription,
+  listSubscriptions,
   normalizeSubscription,
-  readSubscriptions,
-  removeSubscription,
-  upsertSubscription,
-  writeSubscriptions,
+  saveSubscription,
+  subscriptionKey,
+  subscriptionsPrefix,
 } from "../../functions/lib/subscriptions.js";
 
 const p256dh = Buffer.concat([Buffer.from([0x04]), Buffer.alloc(64, 7)]).toString("base64url");
@@ -18,54 +19,131 @@ const createEnv = (store = new Map()) => ({
   NEXTFLUX_PUSH: {
     get: async (key) => store.get(key) ?? null,
     put: async (key, value) => store.set(key, value),
+    delete: async (key) => store.delete(key),
+    list: async ({ prefix = "", cursor } = {}) => {
+      const names = [...store.keys()].filter((name) => name.startsWith(prefix)).sort();
+      const start = cursor ? Number(cursor) : 0;
+      const page = names.slice(start, start + 1000);
+      const complete = start + 1000 >= names.length;
+      return {
+        keys: page.map((name) => ({ name })),
+        list_complete: complete,
+        cursor: complete ? undefined : String(start + 1000),
+      };
+    },
   },
+});
+
+const subscription = (overrides = {}) => ({
+  endpoint,
+  expirationTime: null,
+  keys: { p256dh, auth },
+  ...overrides,
 });
 
 test("decodeBase64Url decodes url-safe values and rejects junk", () => {
   assert.equal(Buffer.from(decodeBase64Url(auth)).length, 16);
   assert.equal(decodeBase64Url("not+base64/"), null);
   assert.equal(decodeBase64Url(undefined), null);
+  assert.equal(decodeBase64Url("A"), null);
 });
 
 test("normalizeSubscription accepts a browser subscription", () => {
-  const subscription = normalizeSubscription({ endpoint, expirationTime: null, keys: { p256dh, auth } });
-  assert.deepEqual(subscription, { endpoint, expirationTime: null, keys: { p256dh, auth } });
-});
-
-test("normalizeSubscription rejects endpoints and keys that push cannot use", () => {
-  assert.equal(normalizeSubscription(null), null);
-  assert.equal(normalizeSubscription({ endpoint: "http://example.com", keys: { p256dh, auth } }), null);
-  assert.equal(normalizeSubscription({ endpoint: "nope", keys: { p256dh, auth } }), null);
-  assert.equal(normalizeSubscription({ endpoint, keys: null }), null);
-  assert.equal(normalizeSubscription({ endpoint, keys: { p256dh: auth, auth } }), null);
-  assert.equal(normalizeSubscription({ endpoint, keys: { p256dh, auth: p256dh } }), null);
-});
-
-test("upsertSubscription keeps one record per endpoint", () => {
-  const first = normalizeSubscription({ endpoint, keys: { p256dh, auth } });
-  const second = normalizeSubscription({ endpoint: `${endpoint}-2`, keys: { p256dh, auth } });
-  const list = upsertSubscription(upsertSubscription([], first), second);
-  assert.equal(list.length, 2);
-  assert.deepEqual(upsertSubscription(list, first).map((item) => item.endpoint).sort(), [
+  assert.deepEqual(normalizeSubscription({ endpoint, expirationTime: null, keys: { p256dh, auth } }), {
     endpoint,
-    `${endpoint}-2`,
-  ].sort());
+    expirationTime: null,
+    keys: { p256dh, auth },
+  });
 });
 
-test("removeSubscription drops a single endpoint", () => {
-  const list = [{ endpoint }, { endpoint: `${endpoint}-2` }];
-  assert.deepEqual(removeSubscription(list, endpoint), [{ endpoint: `${endpoint}-2` }]);
-  assert.deepEqual(removeSubscription(list, "https://example.com/unknown"), list);
+test("normalizeSubscription rejects malformed input", () => {
+  assert.equal(normalizeSubscription(null), null);
+  assert.equal(normalizeSubscription({}), null);
+  assert.equal(normalizeSubscription({ endpoint, keys: {} }), null);
+  assert.equal(
+    normalizeSubscription({ endpoint: "not a url", keys: { p256dh, auth } }),
+    null,
+  );
+  assert.equal(
+    normalizeSubscription({ endpoint: "http://fcm.googleapis.com/x", keys: { p256dh, auth } }),
+    null,
+  );
+  assert.equal(
+    normalizeSubscription({ endpoint, keys: { p256dh: "AAAA", auth } }),
+    null,
+  );
+  assert.equal(
+    normalizeSubscription({ endpoint, keys: { p256dh, auth: "AAAA" } }),
+    null,
+  );
 });
 
-test("subscriptions round-trip through KV and survive corrupt values", async () => {
+test("normalizeSubscription only accepts known push service endpoints", () => {
+  const withEndpoint = (value) =>
+    normalizeSubscription({ endpoint: value, keys: { p256dh, auth } });
+
+  assert.ok(withEndpoint("https://fcm.googleapis.com/fcm/send/abc123"));
+  assert.ok(withEndpoint("https://updates.push.services.mozilla.com/wpush/v2/abc"));
+  assert.ok(withEndpoint("https://web.push.apple.com/QAbc"));
+  assert.ok(withEndpoint("https://db5.notify.windows.com/w/?token=x"));
+  assert.equal(withEndpoint("https://evil.example.com/collect"), null);
+  assert.equal(withEndpoint("https://fcm.googleapis.com.evil.com/x"), null);
+  assert.equal(withEndpoint("https://notfcm.googleapis.com/x"), null);
+});
+
+test("saveSubscription and listSubscriptions round-trip per user", async () => {
   const env = createEnv();
-  assert.deepEqual(await readSubscriptions(env), []);
+  await saveSubscription(env, 1, subscription());
+  await saveSubscription(env, 2, subscription({ endpoint: "https://web.push.apple.com/xyz" }));
 
-  const list = [{ endpoint, expirationTime: null, keys: { p256dh, auth } }];
-  await writeSubscriptions(env, list);
-  assert.deepEqual(await readSubscriptions(env), list);
+  const userOne = await listSubscriptions(env, 1);
+  assert.equal(userOne.length, 1);
+  assert.equal(userOne[0].endpoint, endpoint);
+  assert.equal(userOne[0].savedAt > 0, true);
 
-  await env.NEXTFLUX_PUSH.put("subscriptions:v1", "not json");
-  assert.deepEqual(await readSubscriptions(env), []);
+  const userTwo = await listSubscriptions(env, 2);
+  assert.equal(userTwo.length, 1);
+  assert.equal(userTwo[0].endpoint, "https://web.push.apple.com/xyz");
+});
+
+test("re-subscribing the same endpoint replaces the stored keys", async () => {
+  const env = createEnv();
+  await saveSubscription(env, 1, subscription());
+  const otherKeys = { p256dh: Buffer.concat([Buffer.from([0x04]), Buffer.alloc(64, 8)]).toString("base64url"), auth: Buffer.alloc(16, 3).toString("base64url") };
+  await saveSubscription(env, 1, subscription({ keys: otherKeys }));
+
+  const listed = await listSubscriptions(env, 1);
+  assert.equal(listed.length, 1);
+  assert.deepEqual(listed[0].keys, otherKeys);
+});
+
+test("deleteSubscription removes only that endpoint", async () => {
+  const env = createEnv();
+  await saveSubscription(env, 1, subscription());
+  await saveSubscription(env, 1, subscription({ endpoint: "https://web.push.apple.com/xyz" }));
+
+  await deleteSubscription(env, 1, endpoint);
+  const listed = await listSubscriptions(env, 1);
+  assert.equal(listed.length, 1);
+  assert.equal(listed[0].endpoint, "https://web.push.apple.com/xyz");
+});
+
+test("saveSubscription evicts the oldest device past the cap", async () => {
+  const env = createEnv();
+  for (let index = 0; index < 20; index += 1) {
+    await saveSubscription(env, 1, subscription({ endpoint: `https://fcm.googleapis.com/fcm/send/dev${index}` }));
+  }
+  await saveSubscription(env, 1, subscription({ endpoint: "https://fcm.googleapis.com/fcm/send/dev20" }));
+
+  const listed = await listSubscriptions(env, 1);
+  assert.equal(listed.length, 20);
+  assert.ok(listed.some((item) => item.endpoint.endsWith("dev20")));
+});
+
+test("subscriptionKey is stable per user and endpoint", async () => {
+  const keyA = await subscriptionKey(1, endpoint);
+  assert.equal(keyA, await subscriptionKey(1, endpoint));
+  assert.notEqual(keyA, await subscriptionKey(2, endpoint));
+  assert.notEqual(keyA, await subscriptionKey(1, "https://fcm.googleapis.com/fcm/send/other"));
+  assert.ok(keyA.startsWith(subscriptionsPrefix(1)));
 });

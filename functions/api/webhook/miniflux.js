@@ -2,7 +2,7 @@ import { json } from "../../lib/http.js";
 import { buildNewEntriesNotice } from "../../lib/notice.js";
 import { deliverPush } from "../../lib/push.js";
 import { verifyMinifluxSignature } from "../../lib/signature.js";
-import { readSubscriptions, writeSubscriptions } from "../../lib/subscriptions.js";
+import { listSubscriptions, pruneSubscriptions } from "../../lib/subscriptions.js";
 
 export async function onRequestPost({ request, env }) {
   const secret = env.MINIFLUX_WEBHOOK_SECRET;
@@ -24,7 +24,14 @@ export async function onRequestPost({ request, env }) {
   const notice = buildNewEntriesNotice(payload);
   if (!notice) return json({ ok: true, sent: 0 });
 
-  const subscriptions = await readSubscriptions(env);
+  // Subscriptions are stored per Miniflux user, so the webhook only reaches
+  // the devices of the user whose feed refreshed.
+  const userId = payload?.feed?.user_id;
+  if (userId === undefined || userId === null) {
+    return json({ error: "missing_user_id" }, { status: 400 });
+  }
+
+  const subscriptions = await listSubscriptions(env, userId);
   if (subscriptions.length === 0) return json({ ok: true, sent: 0 });
 
   const results = await Promise.all(
@@ -34,14 +41,31 @@ export async function onRequestPost({ request, env }) {
     })),
   );
 
-  const alive = results.filter(({ outcome }) => outcome !== "gone").map(({ subscription }) => subscription);
-  if (alive.length !== subscriptions.length) await writeSubscriptions(env, alive);
+  const gone = results
+    .filter(({ outcome }) => outcome === "gone")
+    .map(({ subscription }) => subscription.endpoint);
+  if (gone.length) await pruneSubscriptions(env, userId, gone);
 
   const sent = results.filter(({ outcome }) => outcome === "sent").length;
+  const failed = results.filter(({ outcome }) => outcome.startsWith("failed")).length;
+  if (failed) {
+    console.error("web_push_delivery_failed", { userId, sent, failed, pruned: gone.length });
+  }
+
+  // Miniflux does not retry webhook deliveries, so a total failure is
+  // surfaced as an error instead of being acknowledged silently.
+  if (sent === 0 && failed > 0) {
+    return json(
+      { ok: false, error: "push_delivery_failed", articles: notice.count, sent, failed, pruned: gone.length },
+      { status: 502 },
+    );
+  }
+
   return json({
     ok: true,
     articles: notice.count,
     sent,
-    pruned: subscriptions.length - alive.length,
+    failed,
+    pruned: gone.length,
   });
 }

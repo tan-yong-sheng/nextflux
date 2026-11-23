@@ -12,7 +12,7 @@ export function vapidKeys(env) {
 
 export async function buildPushRequest(subscription, notice, env) {
   const payload = await buildPushPayload(
-    { data: notice, options: { ttl: TTL_SECONDS, urgency: "normal" } },
+    { data: JSON.stringify(notice), options: { ttl: TTL_SECONDS, urgency: "normal" } },
     subscription,
     vapidKeys(env),
   );
@@ -28,7 +28,8 @@ export async function deliverPush(env, subscription, notice) {
   let request;
   try {
     request = await buildPushRequest(subscription, notice, env);
-  } catch {
+  } catch (error) {
+    console.error("web_push_encrypt_failed", error);
     return "failed:encrypt";
   }
 

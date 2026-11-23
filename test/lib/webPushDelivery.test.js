@@ -75,5 +75,14 @@ test("deliverPush survives network failures and broken subscriptions", async () 
   );
 
   const broken = { ...subscription, keys: { p256dh: "AAAA", auth: "AAAA" } };
-  assert.equal(await deliverPush(env, broken, notice), "failed:encrypt");
+  let fetchCalled = false;
+  const outcome = await withFetch(
+    async () => {
+      fetchCalled = true;
+      throw new Error("fetch must not be reached for an unencryptable subscription");
+    },
+    () => deliverPush(env, broken, notice),
+  );
+  assert.equal(outcome, "failed:encrypt");
+  assert.equal(fetchCalled, false);
 });

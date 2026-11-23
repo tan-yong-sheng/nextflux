@@ -2,9 +2,7 @@ import { json, readJson } from "../../lib/http.js";
 import { requireMinifluxUser } from "../../lib/auth.js";
 import {
   normalizeSubscription,
-  readSubscriptions,
-  upsertSubscription,
-  writeSubscriptions,
+  saveSubscription,
 } from "../../lib/subscriptions.js";
 
 export async function onRequestPost({ request, env }) {
@@ -14,9 +12,7 @@ export async function onRequestPost({ request, env }) {
   const subscription = normalizeSubscription(await readJson(request));
   if (!subscription) return json({ error: "invalid_subscription" }, { status: 400 });
 
-  const current = await readSubscriptions(env);
-  const next = upsertSubscription(current, subscription);
-  await writeSubscriptions(env, next);
+  await saveSubscription(env, auth.user.id, subscription);
 
-  return json({ ok: true, subscriptions: next.length });
+  return json({ ok: true });
 }
