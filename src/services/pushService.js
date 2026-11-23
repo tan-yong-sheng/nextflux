@@ -90,13 +90,15 @@ async function fetchVapidKey() {
 
 async function currentRegistration() {
   if (!("serviceWorker" in navigator)) return null;
-  // On the very first opt-in the worker may still be installing, and
-  // getRegistration() answers nothing until it activates. Ready resolves once
-  // an active worker controls this page, so wait for it with a short cap.
-  const ready = navigator.serviceWorker.ready;
+  const existing = await navigator.serviceWorker.getRegistration();
+  // Nothing is registered on builds without the worker, and `ready` would
+  // never settle there, so answer right away instead of stalling the sync.
+  if (!existing) return null;
+  // On the very first opt-in the worker may still be installing, and a
+  // registration without an active worker cannot subscribe. Ready resolves
+  // once an active worker is available, so wait for it with a short cap.
   const timeout = new Promise((resolve) => setTimeout(() => resolve(null), 8000));
-  const registration = await Promise.race([ready, timeout]);
-  return registration || (await navigator.serviceWorker.getRegistration()) || null;
+  return (await Promise.race([navigator.serviceWorker.ready, timeout])) || existing;
 }
 
 export async function refreshPushSubscription() {
