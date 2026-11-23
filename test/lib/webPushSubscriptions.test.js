@@ -130,14 +130,24 @@ test("deleteSubscription removes only that endpoint", async () => {
 
 test("saveSubscription evicts the oldest device past the cap", async () => {
   const env = createEnv();
-  for (let index = 0; index < 20; index += 1) {
-    await saveSubscription(env, 1, subscription({ endpoint: `https://fcm.googleapis.com/fcm/send/dev${index}` }));
+  // Distinct save times make the eviction order deterministic.
+  const realNow = Date.now;
+  let now = 1_000;
+  Date.now = () => (now += 10);
+  try {
+    for (let index = 0; index < 20; index += 1) {
+      await saveSubscription(env, 1, subscription({ endpoint: `https://fcm.googleapis.com/fcm/send/dev${index}` }));
+    }
+    await saveSubscription(env, 1, subscription({ endpoint: "https://fcm.googleapis.com/fcm/send/dev20" }));
+  } finally {
+    Date.now = realNow;
   }
-  await saveSubscription(env, 1, subscription({ endpoint: "https://fcm.googleapis.com/fcm/send/dev20" }));
 
   const listed = await listSubscriptions(env, 1);
   assert.equal(listed.length, 20);
   assert.ok(listed.some((item) => item.endpoint.endsWith("dev20")));
+  // The first device saved is the one dropped, not just any of the 20 kept.
+  assert.equal(listed.some((item) => item.endpoint.endsWith("dev0")), false);
 });
 
 test("subscriptionKey is stable per user and endpoint", async () => {
