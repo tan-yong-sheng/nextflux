@@ -315,7 +315,7 @@ export default {
       notifyDisableFailed:
         "Notifications could not be turned off on the server. Try again.",
       notifyEnableFailed:
-        "Notifications could not be turned on on the server. Try again.",
+        "Notifications could not be enabled on the server. Try again.",
       notifyDenied:
         "Notification permission was denied. Allow notifications for Nextflux in your browser or system settings.",
       notifyUnsupported: "This browser does not support notifications.",

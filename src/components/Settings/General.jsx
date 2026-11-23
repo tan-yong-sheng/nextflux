@@ -64,8 +64,10 @@ export default function General() {
     // notification still covers the case where the app's tab is visible.
     const result = await syncPushState(true);
     // A hosted build can refuse the subscription, so the reader has to know
-    // that the switch is on without any background push behind it.
-    if (result === "failed" || result === "unconfigured") {
+    // that the switch is on without any background push behind it. A
+    // self-hosted build reports "unconfigured" on purpose: the sync-driven
+    // notice is the supported fallback there.
+    if (result === "failed") {
       toast.error(t("settings.general.notifyEnableFailed"));
     }
   };

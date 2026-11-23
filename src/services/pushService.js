@@ -57,6 +57,9 @@ async function postJson(path, body, { keepalive = false } = {}) {
     // A logout ends the session while the request is still running, so the
     // unregister has to survive the page unload.
     keepalive,
+    // The sync run waits on this registration, so a stalled request must not
+    // hold it.
+    signal: AbortSignal.timeout(10000),
   });
   if (!response.ok) {
     throw new Error(`push_endpoint_${response.status}`);
