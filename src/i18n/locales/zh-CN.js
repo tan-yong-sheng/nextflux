@@ -173,6 +173,13 @@ export default {
       categoryNameRequired: "请输入分类标题",
     },
   },
+  forYou: {
+    title: "为你推荐",
+    summary: "为你挑选了 {{count}} 篇文章",
+    summaryWithoutSignal: "收藏几篇文章即可获得推荐",
+    oftenRead: "常读",
+    empty: "还没有推荐内容 —— 收藏几篇文章后这里就会填满。",
+  },
   articleView: {
     fillViewport: "进入全视图",
     restoreViewport: "退出全视图",

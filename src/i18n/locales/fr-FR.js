@@ -175,6 +175,13 @@ export default {
       categoryNameRequired: "Veuillez entrer le titre de la catégorie",
     },
   },
+  forYou: {
+    title: "Pour vous",
+    summary: "{{count}} articles sélectionnés pour vous",
+    summaryWithoutSignal: "Marquez quelques articles pour obtenir des suggestions",
+    oftenRead: "souvent lu",
+    empty: "Rien à recommander pour l’instant — marquez quelques articles pour remplir cette liste.",
+  },
   articleView: {
     fillViewport: "Passer en vue complète",
     restoreViewport: "Quitter la vue complète",
