@@ -30,6 +30,7 @@ export function collectNewArticleNotice(
   showHiddenFeeds = false,
 ) {
   if (!articles?.length) return null;
+  const feedIds = new Set(feeds.map((feed) => String(feed.id)));
   const hiddenFeedIds = showHiddenFeeds
     ? null
     : new Set(
@@ -40,6 +41,7 @@ export function collectNewArticleNotice(
   const relevant = articles.filter(
     (article) =>
       article.status === "unread" &&
+      feedIds.has(String(article.feedId)) &&
       !hiddenFeedIds?.has(String(article.feedId)),
   );
   if (!relevant.length) return null;

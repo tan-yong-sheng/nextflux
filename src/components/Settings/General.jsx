@@ -21,6 +21,7 @@ import Language from "@/components/Settings/components/Language.jsx";
 import { useTranslation } from "react-i18next";
 import SettingIcon from "@/components/ui/SettingIcon";
 import {
+  notificationPermission,
   requestNotificationPermission,
   supportsNotifications,
 } from "@/services/notificationService";
@@ -46,10 +47,12 @@ export default function General() {
       toast.error(t("settings.general.notifyUnsupported"));
       return;
     }
-    if ((await requestNotificationPermission()) !== "granted") {
+    const permission = await requestNotificationPermission();
+    if (permission === "denied") {
       toast.error(t("settings.general.notifyDenied"));
       return;
     }
+    if (permission !== "granted") return;
     updateSettings({ notifyNewArticles: true });
   };
   return (
@@ -97,7 +100,9 @@ export default function General() {
             </SettingIcon>
           }
           settingName="notifyNewArticles"
-          settingValue={notifyNewArticles}
+          settingValue={
+            notifyNewArticles && notificationPermission() === "granted"
+          }
           onChange={toggleNotifications}
         />
       </ItemWrapper>

@@ -1,4 +1,5 @@
 import { atom } from "nanostores";
+import { persistentAtom } from "@nanostores/persistent";
 import {
   getLastSyncTime,
   isHistorySyncComplete,
@@ -6,7 +7,7 @@ import {
 import { reportError } from "@/lib/errors.js";
 import { syncService } from "@/services/syncService.js";
 import { settingsState } from "@/stores/settingsStore.js";
-import { feeds } from "@/stores/feedsStore.js";
+import { feeds, loadFeeds } from "@/stores/feedsStore.js";
 import {
   collectNewArticleNotice,
   notificationRunEnabled,
@@ -17,6 +18,7 @@ import {
 } from "@/services/notificationService.js";
 
 import { sessionAccount } from "@/stores/authStore.js";
+import { accountStorageKey } from "@/domain/auth/accounts.js";
 
 export const isOnline = atom(navigator.onLine);
 export const isSyncing = atom(false);
@@ -30,6 +32,35 @@ let inFlight = null;
 let running = false;
 let failures = 0;
 let retryAfter = 0;
+
+// Articles added by a sync run that failed before the notice was shown. Their
+// rows are already committed, so a retry would not report them as added again;
+// persisting them lets the next successful run still announce them.
+const pendingNoticeArticles = persistentAtom(
+  accountStorageKey(sessionAccount, "pendingNewArticleNotice"),
+  [],
+  {
+    encode: (value) => JSON.stringify(value),
+    decode: (str) => JSON.parse(str),
+  },
+);
+const NOTICE_ARTICLE_LIMIT = 200;
+
+function mergeNoticeCandidates(pending, added) {
+  const seen = new Set(pending.map(({ id }) => id));
+  const next = [...pending];
+  for (const article of added) {
+    if (seen.has(article.id)) continue;
+    seen.add(article.id);
+    next.push({
+      id: article.id,
+      title: article.title,
+      feedId: article.feedId,
+      status: article.status,
+    });
+  }
+  return next.slice(-NOTICE_ARTICLE_LIMIT);
+}
 
 export function sync() {
   if (inFlight) return inFlight;
@@ -63,16 +94,25 @@ export function sync() {
     lastSync.set(result);
     failures = 0;
     retryAfter = 0;
-    if (runAllowsNotice && newArticles.length) {
-      const notice = collectNewArticleNotice(
+    if (runAllowsNotice) {
+      const candidates = mergeNoticeCandidates(
+        pendingNoticeArticles.get(),
         newArticles,
-        feeds.get(),
-        settingsState.get().showHiddenFeeds,
       );
-      if (notice) {
-        await showNewArticles(notice).catch((noticeError) =>
-          reportError(noticeError, "notification.show"),
+      if (candidates.length) {
+        // This sync may have changed feed visibility; refresh before deciding.
+        await loadFeeds();
+        const notice = collectNewArticleNotice(
+          candidates,
+          feeds.get(),
+          settingsState.get().showHiddenFeeds,
         );
+        pendingNoticeArticles.set([]);
+        if (notice) {
+          await showNewArticles(notice).catch((noticeError) =>
+            reportError(noticeError, "notification.show"),
+          );
+        }
       }
     }
     return result;
@@ -89,6 +129,11 @@ export function sync() {
   )
     .catch((syncError) => {
       if (signal.aborted) return;
+      if (runAllowsNotice && newArticles.length) {
+        pendingNoticeArticles.set(
+          mergeNoticeCandidates(pendingNoticeArticles.get(), newArticles),
+        );
+      }
       failures += 1;
       retryAfter =
         Date.now() + Math.min(30 * 60_000, 30_000 * 2 ** (failures - 1));

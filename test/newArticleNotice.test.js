@@ -33,6 +33,15 @@ test("skips hidden feeds unless the user shows them", () => {
   });
 });
 
+test("ignores articles whose feed is not in the feed list", () => {
+  const notice = collectNewArticleNotice(
+    [article(1), article(2, { feedId: 99 })],
+    [{ id: 1, hide_globally: false }],
+  );
+  assert.deepEqual(notice, { count: 1, titles: ["Article 1"] });
+  assert.equal(collectNewArticleNotice([article(2, { feedId: 99 })], []), null);
+});
+
 test("returns null when nothing qualifies", () => {
   assert.equal(collectNewArticleNotice([], []), null);
   assert.equal(
@@ -43,7 +52,9 @@ test("returns null when nothing qualifies", () => {
 
 test("limits titles but counts every new article", () => {
   const articles = [1, 2, 3, 4, 5].map((id) => article(id));
-  const notice = collectNewArticleNotice(articles, []);
+  const notice = collectNewArticleNotice(articles, [
+    { id: 1, hide_globally: false },
+  ]);
   assert.equal(notice.count, 5);
   assert.deepEqual(notice.titles, [
     "Article 1",
