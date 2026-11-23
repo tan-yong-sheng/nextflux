@@ -90,7 +90,13 @@ async function fetchVapidKey() {
 
 async function currentRegistration() {
   if (!("serviceWorker" in navigator)) return null;
-  return (await navigator.serviceWorker.getRegistration()) || null;
+  // On the very first opt-in the worker may still be installing, and
+  // getRegistration() answers nothing until it activates. Ready resolves once
+  // an active worker controls this page, so wait for it with a short cap.
+  const ready = navigator.serviceWorker.ready;
+  const timeout = new Promise((resolve) => setTimeout(() => resolve(null), 8000));
+  const registration = await Promise.race([ready, timeout]);
+  return registration || (await navigator.serviceWorker.getRegistration()) || null;
 }
 
 export async function refreshPushSubscription() {
