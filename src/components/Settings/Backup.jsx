@@ -18,6 +18,7 @@ import {
 } from "@/domain/preferences/settingsBackup";
 import { datedFilename, downloadFile } from "@/lib/download";
 import { reportError } from "@/lib/errors";
+import GitHubBackup from "./GitHubBackup";
 
 export default function Backup() {
   const { t, i18n } = useTranslation();
@@ -191,6 +192,8 @@ export default function Backup() {
           onChange={readBackup}
         />
       </section>
+      <Separator className="my-2" />
+      <GitHubBackup />
       <Separator className="my-2" />
       <p className="text-xs leading-relaxed text-muted-foreground">
         {t(key("migrationDescription"))}{" "}

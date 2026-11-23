@@ -42,15 +42,19 @@ nextflux/
 1. `GET /v1/export` (existing `exportOPML()` in `src/api/resources/feeds.js`).
 2. `GET /repos/{owner}/{repo}/contents/{path}?ref={branch}` → current blob `sha`, or 404.
 3. Skip the commit when the content is byte-identical.
-4. `PUT /repos/{owner}/{repo}/contents/{path}` with base64 content, the blob `sha` when
-   updating, and a message such as `backup: example.com user 2026-11-23 (142 feeds)`.
-5. On `409`, re-read the blob and retry once; on a second failure, report and stop.
+4. Write the OPML and `meta.json` in **one commit** through the git database API
+   (`POST /git/trees` → `POST /git/commits` → `PATCH /git/refs/heads/{branch}`), with a
+   message such as `backup: example.com user 2026-11-23 (142 feeds)`. The contents API
+   creates one commit per file, which would double the history of every backup.
+5. On a failed ref update (422, the branch head moved), build the commit again on top of
+   the current head and retry once; on a second failure, report and stop.
 
 ## Restore flow
 
 1. `GET /repos/{owner}/{repo}/commits?path={path}&per_page=20`.
 2. `GET /repos/{owner}/{repo}/contents/{path}?ref={commitSha}` → base64 → OPML text.
-3. Parse with `DOMParser`; collect `outline[xmlUrl]` and its category.
+3. Parse the OPML (the `outline` walk in `src/domain/github/opml.js`); collect
+   `outline[xmlUrl]` and its category.
 4. `GET /v1/feeds` → compare URLs.
 5. Preview: `N added`, `M already present`. There are no removals by design.
 6. `POST /v1/import` with the OPML body, then trigger a feed sync.
@@ -76,16 +80,19 @@ touches the active account's Miniflux server.
   `permissions.push`.
 - The token is kept in memory for the session by default. Persisting it to
   `localStorage` is an explicit "remember token" checkbox; the UI names the XSS risk.
-- Never write the token, Miniflux URL, or credentials to the repo. Extend
-  `settingsBackup.js`'s exclusion (it already drops `aiApiKey`) to the new token keys.
+- Never write the token, Miniflux URL, or credentials to the repo. The GitHub
+  configuration lives in its own per-account storage key
+  (`accountStorageKey(account, "githubBackup:v1")`), outside the Nextflux settings
+  backup, so the settings backup cannot export the token.
 - Recommend a private repo: an OPML file reveals reading interests.
 
 ## When backups run
 
-- **Manual** always available.
-- **Automatic, opt-in, default off**: debounced 30 s after a feed is added, removed, or
-  OPML is imported; and on app start when the last backup is older than 24 h. Automatic
-  backup only runs while the app is open; nothing runs when Nextflux is closed.
+- **Manual** always available (the "Back up now" button).
+- **Automatic backup is not implemented in the first version.** The plan is a debounced
+  30 s after a feed is added, removed, or OPML is imported, plus a run on app start when
+  the last backup is older than 24 h. It would only run while the app is open; nothing
+  runs when Nextflux is closed.
 
 ## UI
 
@@ -100,7 +107,7 @@ Settings → Backup, new "GitHub backup" section: repo, branch, path, token, *Te
 | 401 | bad or expired token | ask to re-enter |
 | 403 | missing scope or rate limit | name the missing permission / retry later |
 | 404 | repo, branch, or path missing | verify repo/branch; create the path on first backup |
-| 409 | blob changed since read | refetch and retry once |
+| 409 / 422 | branch head moved since the read | rebuild the commit on the current head, retry once |
 | offline | network error | toast, retry on next trigger |
 
 A failed backup never blocks feed operations.
@@ -143,8 +150,8 @@ git.
 ## Testing
 
 - Unit: account key derivation, OPML parsing, added/present diff, GitHub client against a
-  mocked `fetch` (404 → create, 409 → retry, base64 round-trip, identical content → no
-  commit).
+  mocked `fetch` (missing path → create, ref conflict → retry, base64 round-trip,
+  identical content → no commit, one commit for both files).
 - Manual: one private repo, backup, verify the commit, restore an older commit into a
   disposable Miniflux account.
 

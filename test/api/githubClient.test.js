@@ -1,0 +1,206 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+
+import {
+  fromBase64,
+  GitHubClient,
+  GitHubError,
+  parseRepo,
+  toBase64,
+} from "../../src/api/github/client.js";
+
+function jsonResponse(body, { status = 200, ok = status < 400 } = {}) {
+  return {
+    ok,
+    status,
+    json: async () => body,
+  };
+}
+
+test("parses owner/name repositories and rejects invalid values", () => {
+  assert.deepEqual(parseRepo("octocat/hello"), {
+    owner: "octocat",
+    name: "hello",
+    fullName: "octocat/hello",
+  });
+  assert.equal(parseRepo("octocat/hello.git").fullName, "octocat/hello");
+  assert.equal(parseRepo("hello"), null);
+  assert.equal(parseRepo("a/b/c"), null);
+  assert.equal(parseRepo(""), null);
+});
+
+test("base64 round-trips unicode content", () => {
+  const content = "<opml>ü 中文</opml>";
+  assert.equal(fromBase64(toBase64(content)), content);
+});
+
+test("readFile returns the decoded content and blob sha", async () => {
+  const client = new GitHubClient({
+    token: "t",
+    fetchImpl: async () =>
+      jsonResponse({
+        sha: "blob-sha",
+        encoding: "base64",
+        content: toBase64("hello"),
+      }),
+  });
+  const file = await client.readFile("o/r", "nextflux/a/subscriptions.opml", {
+    branch: "main",
+  });
+  assert.equal(file.found, true);
+  assert.equal(file.sha, "blob-sha");
+  assert.equal(file.content, "hello");
+});
+
+test("readFile reports a missing path as not found", async () => {
+  const client = new GitHubClient({
+    token: "t",
+    fetchImpl: async () => jsonResponse({ message: "Not Found" }, { status: 404 }),
+  });
+  const file = await client.readFile("o/r", "missing.opml");
+  assert.equal(file.found, false);
+});
+
+test("writeFile sends base64 content and the current blob sha", async () => {
+  let request = null;
+  const client = new GitHubClient({
+    token: "t",
+    fetchImpl: async (url, options) => {
+      request = { url, options };
+      return jsonResponse({
+        content: { sha: "new-blob" },
+        commit: { sha: "commit-sha", html_url: "https://github.com/o/r/commit" },
+      });
+    },
+  });
+  const result = await client.writeFile("o/r", "a.opml", "body", {
+    branch: "main",
+    message: "backup: test",
+    sha: "old-blob",
+  });
+  assert.equal(request.options.method, "PUT");
+  assert.equal(request.options.headers.Authorization, "Bearer t");
+  const body = JSON.parse(request.options.body);
+  assert.equal(body.content, toBase64("body"));
+  assert.equal(body.sha, "old-blob");
+  assert.equal(body.branch, "main");
+  assert.equal(body.message, "backup: test");
+  assert.equal(result.commitSha, "commit-sha");
+});
+
+test("writeFile omits the sha when creating a new file", async () => {
+  let body = null;
+  const client = new GitHubClient({
+    token: "t",
+    fetchImpl: async (url, options) => {
+      body = JSON.parse(options.body);
+      return jsonResponse({ content: {}, commit: {} });
+    },
+  });
+  await client.writeFile("o/r", "a.opml", "body", { branch: "main", message: "m" });
+  assert.equal("sha" in body, false);
+});
+
+test("listCommits maps the GitHub payload to the fields the UI needs", async () => {
+  const client = new GitHubClient({
+    token: "t",
+    fetchImpl: async () =>
+      jsonResponse([
+        {
+          sha: "abc",
+          commit: {
+            message: "backup: example.com 2026-11-23 (3 feeds)",
+            author: { date: "2026-11-23T10:00:00Z", name: "alice" },
+          },
+        },
+      ]),
+  });
+  const commits = await client.listCommits("o/r", "nextflux/a/subscriptions.opml", {
+    branch: "main",
+  });
+  assert.equal(commits.length, 1);
+  assert.equal(commits[0].sha, "abc");
+  assert.equal(commits[0].message, "backup: example.com 2026-11-23 (3 feeds)");
+  assert.equal(commits[0].date, "2026-11-23T10:00:00Z");
+});
+
+test("commitFiles writes every file of the backup in one commit", async () => {
+  const requests = [];
+  const client = new GitHubClient({
+    token: "t",
+    fetchImpl: async (url, options = {}) => {
+      requests.push({ url, method: options.method || "GET" });
+      if (url.includes("/git/ref/heads/")) {
+        return jsonResponse({ object: { sha: "base-sha" } });
+      }
+      if (url.includes("/git/commits/base-sha")) {
+        return jsonResponse({ tree: { sha: "tree-sha" } });
+      }
+      if (url.endsWith("/git/trees")) {
+        return jsonResponse({ sha: "new-tree" });
+      }
+      if (url.endsWith("/git/commits")) {
+        return jsonResponse({ sha: "new-commit" });
+      }
+      return jsonResponse({ object: { url: "https://api.github.com/commit" } });
+    },
+  });
+
+  const result = await client.commitFiles("o/r", {
+    branch: "main",
+    message: "backup",
+    files: [
+      { path: "nextflux/a/subscriptions.opml", content: "<opml/>" },
+      { path: "nextflux/a/meta.json", content: "{}" },
+    ],
+  });
+
+  assert.equal(result.commitSha, "new-commit");
+  const treeRequest = requests.find((request) => request.url.endsWith("/git/trees"));
+  assert.equal(treeRequest.method, "POST");
+  const reference = requests.find((request) =>
+    request.url.includes("/git/refs/heads/"),
+  );
+  assert.equal(reference.method, "PATCH");
+});
+
+test("testAccess rejects an invalid repository before any request", async () => {
+  let called = false;
+  const client = new GitHubClient({
+    token: "t",
+    fetchImpl: async () => {
+      called = true;
+      return jsonResponse({});
+    },
+  });
+  const result = await client.testAccess("not-a-repo");
+  assert.equal(result.ok, false);
+  assert.equal(called, false);
+});
+
+test("testAccess surfaces the repository permissions", async () => {
+  const client = new GitHubClient({
+    token: "t",
+    fetchImpl: async () => jsonResponse({ permissions: { push: true } }),
+  });
+  const result = await client.testAccess("o/r");
+  assert.equal(result.ok, true);
+  assert.equal(result.permissions.push, true);
+});
+
+test("HTTP failures carry the status code and the GitHub message", async () => {
+  const client = new GitHubClient({
+    token: "bad",
+    fetchImpl: async () =>
+      jsonResponse({ message: "Bad credentials" }, { status: 401 }),
+  });
+  await assert.rejects(
+    () => client.writeFile("o/r", "a.opml", "body", { message: "m" }),
+    (error) => {
+      assert.equal(error instanceof GitHubError, true);
+      assert.equal(error.status, 401);
+      assert.equal(error.code, "Bad credentials");
+      return true;
+    },
+  );
+});

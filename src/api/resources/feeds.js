@@ -55,6 +55,17 @@ export async function importOPML(file) {
   return response.data;
 }
 
+/**
+ * Import an OPML document from a raw string.
+ * Miniflux skips feeds that already exist and never removes subscriptions.
+ */
+export async function importOPMLText(opml) {
+  const response = await apiClient.post("/v1/import", opml, {
+    headers: { "Content-Type": "application/xml" },
+  });
+  return response.data;
+}
+
 export async function exportOPML() {
   const response = await apiClient.get("/v1/export", { responseType: "text" });
   return response.data;
