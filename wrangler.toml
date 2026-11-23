@@ -1,0 +1,18 @@
+name = "nextflux"
+pages_build_output_dir = "dist"
+compatibility_date = "2026-11-23"
+
+# Push subscriptions live in one KV entry (see functions/lib/subscriptions.js).
+# Secrets are project-wide and set with
+# `wrangler pages secret put <NAME> --project-name nextflux`:
+# MINIFLUX_URL, MINIFLUX_WEBHOOK_SECRET, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT.
+[[kv_namespaces]]
+binding = "NEXTFLUX_PUSH"
+id = "db7d233e09804b198acf20fb394ac25d"
+preview_id = "65db4059deba45eab377e7c7df17a1fd"
+
+# Preview deployments get their own subscription store, so test devices never
+# land in production data. Non-inheritable keys must be repeated per environment.
+[[env.preview.kv_namespaces]]
+binding = "NEXTFLUX_PUSH"
+id = "65db4059deba45eab377e7c7df17a1fd"
