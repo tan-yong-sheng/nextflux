@@ -1,6 +1,7 @@
 import { createBrowserRouter } from "react-router-dom";
 import App from "@/App";
 import ArticleList from "@/components/ArticleList/ArticleList";
+import ForYouList from "@/components/ForYou/ForYouList";
 import LoginPage from "@/pages/LoginPage";
 import ErrorPage from "@/pages/ErrorPage";
 import ProtectedRoute from "@/components/ProtectedRoute";
@@ -55,6 +56,14 @@ export const router = createBrowserRouter(
         {
           path: "article/:articleId",
           element: <ArticleList />,
+        },
+        {
+          path: "foryou",
+          element: <ForYouList />,
+        },
+        {
+          path: "foryou/article/:articleId",
+          element: <ForYouList />,
         },
       ],
     },

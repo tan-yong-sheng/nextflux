@@ -1,7 +1,7 @@
 import { useStore } from "@nanostores/react";
 import { filter } from "@/stores/articlesStore.js";
 import { totalStarredCount, totalUnreadCount } from "@/stores/feedsStore.js";
-import { CircleDot, Infinity as InfinityIcon, Star } from "lucide-react";
+import { CircleDot, Infinity as InfinityIcon, Sparkles, Star } from "lucide-react";
 import {
   SidebarGroup,
   SidebarGroupLabel,
@@ -11,7 +11,7 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar.jsx";
-import { Link, useParams } from "react-router-dom";
+import { Link, useLocation, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 const ArticlesGroup = () => {
   const { t } = useTranslation();
@@ -20,6 +20,7 @@ const ArticlesGroup = () => {
   const $totalStarredCount = useStore(totalStarredCount);
   const { isMobile, setOpenMobile } = useSidebar();
   const { feedId, categoryId } = useParams();
+  const { pathname } = useLocation();
   // 根据筛选条件获取显示文本和计数
   const getDisplayInfo = () => {
     switch ($filter) {
@@ -50,7 +51,11 @@ const ArticlesGroup = () => {
       <SidebarMenu>
         <SidebarMenuItem>
           <SidebarMenuButton
-            isActive={!feedId && !categoryId}
+            isActive={
+              !feedId &&
+              !categoryId &&
+              !pathname.startsWith("/foryou")
+            }
             render={
               <Link to="/" onClick={() => isMobile && setOpenMobile(false)}>
                 <span className="font-semibold">{text}</span>
@@ -61,6 +66,21 @@ const ArticlesGroup = () => {
           <SidebarMenuBadge className="text-muted-foreground! opacity-60!">
             {count !== 0 && count}
           </SidebarMenuBadge>
+        </SidebarMenuItem>
+        <SidebarMenuItem>
+          <SidebarMenuButton
+            isActive={pathname.startsWith("/foryou")}
+            render={
+              <Link
+                to="/foryou"
+                onClick={() => isMobile && setOpenMobile(false)}
+              >
+                <Sparkles />
+                <span className="font-semibold">{t("forYou.title")}</span>
+              </Link>
+            }
+            nativeButton={false}
+          />
         </SidebarMenuItem>
       </SidebarMenu>
     </SidebarGroup>
