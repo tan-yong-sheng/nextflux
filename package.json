@@ -10,6 +10,9 @@
     "test": "node --test",
     "preview": "vite preview"
   },
+  "engines": {
+    "node": ">=20.19"
+  },
   "dependencies": {
     "@base-ui/react": "^1.8.0",
     "@icons-pack/react-simple-icons": "^11.2.0",
