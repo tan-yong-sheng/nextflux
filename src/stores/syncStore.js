@@ -101,17 +101,22 @@ export function sync() {
       );
       if (candidates.length) {
         // This sync may have changed feed visibility; refresh before deciding.
-        await loadFeeds();
+        // A failed refresh leaves the queue intact for the next run.
+        if (!(await loadFeeds())) return result;
         const notice = collectNewArticleNotice(
           candidates,
           feeds.get(),
           settingsState.get().showHiddenFeeds,
         );
-        pendingNoticeArticles.set([]);
-        if (notice) {
-          await showNewArticles(notice).catch((noticeError) =>
-            reportError(noticeError, "notification.show"),
-          );
+        if (!notice) {
+          pendingNoticeArticles.set([]);
+          return result;
+        }
+        try {
+          await showNewArticles(notice);
+          pendingNoticeArticles.set([]);
+        } catch (noticeError) {
+          reportError(noticeError, "notification.show");
         }
       }
     }

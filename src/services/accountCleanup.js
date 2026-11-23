@@ -40,6 +40,7 @@ export async function cleanupAccountData(account) {
     "syncBootstrap:v1",
     "syncHistoryComplete:v1",
     "categoryExpanded",
+    "pendingNewArticleNotice",
   ]) {
     remove(accountStorageKey(account, key));
   }
