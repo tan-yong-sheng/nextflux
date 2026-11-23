@@ -28,6 +28,9 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useIsMobileViewport, useIsMedium } from "@/hooks/use-mobile";
 import { isModalOpen } from "@/stores/modalStore";
 import { ScrollArea } from "@/components/ui/scroll-area.jsx";
+import { usePrototypeVariant } from "@/components/Prototype/PrototypeSwitcher";
+import SidebarCleanup from "@/components/Prototype/variants/SidebarCleanup.jsx";
+import { useFeedInsights } from "@/components/Prototype/useFeedInsights.js";
 function SyncStatus() {
   const { t } = useTranslation();
   const $lastSync = useStore(lastSync);
@@ -46,6 +49,13 @@ function SyncStatus() {
       {label}
     </span>
   );
+}
+// PROTOTYPE — variant A only: a cleanup section in the sidebar.
+function PrototypeSidebar() {
+  const { variant } = usePrototypeVariant();
+  const { insights } = useFeedInsights();
+  if (variant !== "A") return null;
+  return <SidebarCleanup insights={insights} />;
 }
 const FeedListSidebar = ({ resizable = false }) => {
   const { showHiddenFeeds } = useStore(settingsState);
@@ -111,6 +121,7 @@ const FeedListSidebar = ({ resizable = false }) => {
         >
           <ArticlesGroup />
           <FeedsGroup />
+          <PrototypeSidebar />
         </ScrollArea>
       </SidebarContent>
       <SidebarFooter>

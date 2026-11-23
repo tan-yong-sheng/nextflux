@@ -22,6 +22,10 @@ import { useTranslation } from "react-i18next";
 import { useParams } from "react-router-dom";
 import ArticleListHeader from "./components/ArticleListHeader";
 import ArticleListContent from "./components/ArticleListContent";
+import { usePrototypeVariant, PrototypeSwitcher } from "@/components/Prototype/PrototypeSwitcher";
+import { usePersonalizationData } from "@/components/Prototype/usePersonalizationData";
+import ForYouPanel from "@/components/Prototype/variants/ForYouPanel";
+import PersonalizedPanel from "@/components/Prototype/variants/PersonalizedPanel";
 import ArticleListFooter from "./components/ArticleListFooter";
 import { settingsState } from "@/stores/settingsStore.js";
 import { useIsMedium } from "@/hooks/use-mobile.jsx";
@@ -40,6 +44,9 @@ const ArticleList = () => {
   const { sortDirection, sortField, showHiddenFeeds } = useStore(settingsState);
   const virtuosoRef = useRef(null);
   const isMedium = useIsMedium();
+  // PROTOTYPE: ?variant=A|B|C swaps the rendered surface.
+  const { variant, setVariant } = usePrototypeVariant();
+  const { insights, articles: allArticles } = usePersonalizationData();
   // 判断是否在移动端且正在查看文章详情
   const isArticleDetailOpen = isMedium && !!articleId;
   const scope = JSON.stringify([
@@ -163,12 +170,19 @@ const ArticleList = () => {
             </LiquidGlass>
           </div>
         )}
-        <ArticleListContent
-          articles={$filteredArticles}
-          virtuosoRef={virtuosoRef}
-          setVisibleRange={setVisibleRange}
-        />
+        {variant === "B" ? (
+          <ForYouPanel insights={insights} articles={allArticles} />
+        ) : variant === "C" ? (
+          <PersonalizedPanel insights={insights} />
+        ) : (
+          <ArticleListContent
+            articles={$filteredArticles}
+            virtuosoRef={virtuosoRef}
+            setVisibleRange={setVisibleRange}
+          />
+        )}
         <ArticleListFooter />
+        <PrototypeSwitcher current={variant} onChange={setVariant} />
       </div>
     </ReadingLayout>
   );

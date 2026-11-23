@@ -4,6 +4,7 @@ import ArticleList from "@/components/ArticleList/ArticleList";
 import LoginPage from "@/pages/LoginPage";
 import ErrorPage from "@/pages/ErrorPage";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import PrototypePage from "@/components/Prototype/PrototypePage";
 
 const routerConfig = {
   future: {
@@ -21,6 +22,11 @@ export const router = createBrowserRouter(
     {
       path: "/login",
       element: <LoginPage />,
+      errorElement: <ErrorPage />,
+    },
+    {
+      path: "/prototype",
+      element: <PrototypePage />,
       errorElement: <ErrorPage />,
     },
     {
