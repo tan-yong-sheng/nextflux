@@ -1,22 +1,13 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { requireMinifluxUser } from "../../functions/lib/auth.js";
+import { withFetch } from "./pushTestHelpers.js";
 
 const env = { MINIFLUX_URL: "https://reader.example.com/" };
 
 const request = (headers = {}) => ({
   headers: { get: (name) => headers[name.toLowerCase()] ?? null },
 });
-
-const withFetch = async (impl, run) => {
-  const original = globalThis.fetch;
-  globalThis.fetch = impl;
-  try {
-    return await run();
-  } finally {
-    globalThis.fetch = original;
-  }
-};
 
 const respond = (status, body) => async () => new Response(JSON.stringify(body), { status });
 
@@ -59,6 +50,14 @@ test("upstream failures and network errors map to 502", async () => {
     throw new TypeError("fetch failed");
   }, () => requireMinifluxUser(request({ "x-auth-token": "secret" }), env));
   assert.deepEqual(network, { ok: false, status: 502, error: "miniflux_unreachable" });
+});
+
+test("a non-JSON upstream body is 502, not a non-admin", async () => {
+  const result = await withFetch(
+    async () => new Response("<html>bad gateway</html>", { status: 200 }),
+    () => requireMinifluxUser(request({ "x-auth-token": "secret" }), env),
+  );
+  assert.deepEqual(result, { ok: false, status: 502, error: "miniflux_unreachable" });
 });
 
 test("missing credentials and missing configuration fail fast", async () => {

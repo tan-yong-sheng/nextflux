@@ -3,6 +3,7 @@ import { test } from "node:test";
 import { createECDH, createHmac, generateKeyPairSync } from "node:crypto";
 import { Buffer } from "node:buffer";
 import { buildPushRequest, deliverPush } from "../../functions/lib/push.js";
+import { withFetch } from "./pushTestHelpers.js";
 
 // WebCrypto verifies that client keys are real P-256 points, so the fixtures
 // come from generated key pairs.
@@ -80,16 +81,6 @@ const subscription = {
   keys: { p256dh: client.publicKey, auth: Buffer.alloc(16, 4).toString("base64url") },
 };
 const notice = { count: 2, titles: ["One", "Two"], url: "/" };
-
-const withFetch = async (impl, run) => {
-  const original = globalThis.fetch;
-  globalThis.fetch = impl;
-  try {
-    return await run();
-  } finally {
-    globalThis.fetch = original;
-  }
-};
 
 test("buildPushRequest produces an RFC 8291 request with VAPID auth", async () => {
   const request = await buildPushRequest(subscription, notice, env);

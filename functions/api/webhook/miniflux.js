@@ -2,7 +2,7 @@ import { json } from "../../lib/http.js";
 import { buildNewEntriesNotice } from "../../lib/notice.js";
 import { deliverPush } from "../../lib/push.js";
 import { verifyMinifluxSignature } from "../../lib/signature.js";
-import { listSubscriptions, pruneSubscriptions } from "../../lib/subscriptions.js";
+import { listSubscriptionsForDelivery, pruneSubscriptions } from "../../lib/subscriptions.js";
 
 export async function onRequestPost({ request, env }) {
   const secret = env.MINIFLUX_WEBHOOK_SECRET;
@@ -31,7 +31,7 @@ export async function onRequestPost({ request, env }) {
     return json({ error: "missing_user_id" }, { status: 400 });
   }
 
-  const subscriptions = await listSubscriptions(env, userId);
+  const subscriptions = await listSubscriptionsForDelivery(env, userId);
   if (subscriptions.length === 0) return json({ ok: true, sent: 0 });
 
   // Every device reports the feeds it hides globally, so the notice for that

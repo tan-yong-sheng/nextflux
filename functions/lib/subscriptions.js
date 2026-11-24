@@ -122,6 +122,17 @@ export async function listSubscriptions(env, userId) {
   return records.filter(Boolean);
 }
 
+// The webhook fan-out honours the same device cap as the save path: a user
+// can briefly hold more than MAX_SUBSCRIPTIONS records while concurrent
+// saves race, and delivering to all of them would exceed the cap. The newest
+// records win, matching the eviction order.
+export async function listSubscriptionsForDelivery(env, userId) {
+  const all = await listSubscriptions(env, userId);
+  return all
+    .sort((a, b) => (b.savedAt ?? 0) - (a.savedAt ?? 0))
+    .slice(0, MAX_SUBSCRIPTIONS);
+}
+
 export async function saveSubscription(env, userId, subscription, hiddenFeedIds = []) {
   const key = await subscriptionKey(userId, subscription.endpoint);
   const existing = await listSubscriptions(env, userId);

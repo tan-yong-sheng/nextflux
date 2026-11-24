@@ -37,7 +37,14 @@ export async function requireMinifluxUser(request, env) {
     };
   }
 
-  const user = await response.json().catch(() => null);
+  // A 200 with an unreadable body is an upstream failure, not a non-admin
+  // user, so it reports like the fetch/!response.ok paths above.
+  let user;
+  try {
+    user = await response.json();
+  } catch {
+    return { ok: false, status: 502, error: "miniflux_unreachable" };
+  }
   if (!user?.is_admin) return { ok: false, status: 403, error: "not_instance_owner" };
   return { ok: true, user };
 }

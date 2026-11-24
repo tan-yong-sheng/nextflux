@@ -5,34 +5,18 @@ import {
   decodeBase64Url,
   deleteSubscription,
   listSubscriptions,
+  listSubscriptionsForDelivery,
   normalizeSubscription,
   saveSubscription,
   subscriptionKey,
   subscriptionsPrefix,
 } from "../../functions/lib/subscriptions.js";
-
-const p256dh = Buffer.concat([Buffer.from([0x04]), Buffer.alloc(64, 7)]).toString("base64url");
-const auth = Buffer.alloc(16, 9).toString("base64url");
-const endpoint = "https://fcm.googleapis.com/fcm/send/abc123";
-
-const createEnv = (store = new Map()) => ({
-  NEXTFLUX_PUSH: {
-    get: async (key) => store.get(key) ?? null,
-    put: async (key, value) => store.set(key, value),
-    delete: async (key) => store.delete(key),
-    list: async ({ prefix = "", cursor } = {}) => {
-      const names = [...store.keys()].filter((name) => name.startsWith(prefix)).sort();
-      const start = cursor ? Number(cursor) : 0;
-      const page = names.slice(start, start + 1000);
-      const complete = start + 1000 >= names.length;
-      return {
-        keys: page.map((name) => ({ name })),
-        list_complete: complete,
-        cursor: complete ? undefined : String(start + 1000),
-      };
-    },
-  },
-});
+import {
+  createPushEnv as createEnv,
+  TEST_AUTH as auth,
+  TEST_ENDPOINT as endpoint,
+  TEST_P256DH as p256dh,
+} from "./pushTestHelpers.js";
 
 const subscription = (overrides = {}) => ({
   endpoint,
@@ -187,6 +171,21 @@ test("listSubscriptions returns every record so the save path can evict overflow
   }
 
   assert.equal((await listSubscriptions(env, 1)).length, 25);
+});
+
+test("listSubscriptionsForDelivery caps fan-out at the newest MAX_SUBSCRIPTIONS records", async () => {
+  const store = new Map();
+  const env = createEnv(store);
+  // 25 records, savedAt ascending with the seed index so the newest are 24..5.
+  for (let index = 0; index < 25; index += 1) {
+    const item = subscription({ endpoint: `https://fcm.googleapis.com/fcm/send/delivery${index}` });
+    store.set(await subscriptionKey(1, item.endpoint), JSON.stringify({ ...item, savedAt: index }));
+  }
+
+  const delivered = await listSubscriptionsForDelivery(env, 1);
+  assert.equal(delivered.length, 20);
+  assert.equal(delivered[0].endpoint, "https://fcm.googleapis.com/fcm/send/delivery24");
+  assert.equal(delivered.at(-1).endpoint, "https://fcm.googleapis.com/fcm/send/delivery5");
 });
 
 test("deleteSubscription normalizes the endpoint before deleting", async () => {
