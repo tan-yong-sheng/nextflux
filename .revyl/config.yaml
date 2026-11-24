@@ -1,0 +1,30 @@
+project:
+  id: bd68d94c-106c-43b2-8028-3b7edfe52ac0
+session:
+  idle_timeout_seconds: 1800
+build:
+  framework: web
+  profiles:
+    capacitor:
+      ios:
+        app_id: "5ab923fc-c7b1-4b48-9929-3f367517fc32"
+        image: ios-macos-26-xcode-26.2
+        setup_commands:
+          - npm ci
+          - npm run build
+          - npx cap add ios
+          - npx cap sync ios
+          - cd ios/App && pod install
+        build_commands:
+          - cd ios/App && xcodebuild -workspace App.xcworkspace -scheme App -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath build
+        output_path: ios/App/build/Build/Products/Debug-iphonesimulator/*.app
+      android:
+        app_id: "e59ea29a-8d93-412c-9c82-d7ae1a8613fd"
+        image: android-ubuntu-24.04-jdk-17-ndk-r27b
+        setup_commands:
+          - npm ci
+          - npm run build
+          - npx cap sync android
+        build_commands:
+          - cd android && ./gradlew assembleDebug
+        output_path: android/app/build/outputs/apk/debug/*.apk
