@@ -41,7 +41,14 @@ const pendingNoticeArticles = persistentAtom(
   [],
   {
     encode: (value) => JSON.stringify(value),
-    decode: (str) => JSON.parse(str),
+    decode: (str) => {
+      try {
+        const parsed = JSON.parse(str);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch {
+        return [];
+      }
+    },
   },
 );
 
