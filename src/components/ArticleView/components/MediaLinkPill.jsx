@@ -8,8 +8,10 @@ const SAFE_HREF = /^(https?:|mailto:|tel:)/i;
 function isSafeHref(href) {
   if (typeof href !== "string" || !href) return false;
   const trimmed = href.trim();
-  // No "//" here: protocol-relative URLs navigate to arbitrary external
-  // hosts and can downgrade to http on http deployments.
+  // Reject scheme-relative/backslash URLs before allowing site-relative
+  // paths: "//host" and "\\host" both navigate to an arbitrary external
+  // host (browsers normalize backslashes to slashes).
+  if (/^[/\\]{2}/.test(trimmed)) return false;
   if (trimmed.startsWith("/") || trimmed.startsWith("#")) return true;
   return SAFE_HREF.test(trimmed);
 }
