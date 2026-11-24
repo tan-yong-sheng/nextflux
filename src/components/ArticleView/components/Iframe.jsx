@@ -55,6 +55,9 @@ const Iframe = ({ domNode }) => {
       <iframe
         src={finalSrc}
         {...iframeProps}
+        // Remote embeds are untrusted: no same-origin access to us, no
+        // top-navigation, no downloads. Scripts/popups stay so players work.
+        sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"
         className={cn(
           "w-full border-0",
           isLoading ? "opacity-0" : "opacity-100",
