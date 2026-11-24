@@ -44,7 +44,12 @@ const pendingNoticeArticles = persistentAtom(
     decode: (str) => {
       try {
         const parsed = JSON.parse(str);
-        return Array.isArray(parsed) ? parsed : [];
+        if (!Array.isArray(parsed)) return [];
+        // mergeNoticeCandidates destructures every pending item, so drop
+        // anything a corrupted write may have left behind.
+        return parsed.filter(
+          (item) => item && typeof item === "object" && item.id !== undefined && item.id !== null,
+        );
       } catch {
         return [];
       }
