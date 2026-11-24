@@ -117,7 +117,9 @@ export async function listSubscriptions(env, userId) {
       }
     }),
   );
-  return records.filter(Boolean).slice(-MAX_SUBSCRIPTIONS);
+  // Return every record, not just the newest MAX_SUBSCRIPTIONS: the save path
+  // needs the full set to evict the overflow instead of hiding it.
+  return records.filter(Boolean);
 }
 
 export async function saveSubscription(env, userId, subscription, hiddenFeedIds = []) {
@@ -149,7 +151,16 @@ export async function saveSubscription(env, userId, subscription, hiddenFeedIds 
 
 export async function deleteSubscription(env, userId, endpoint) {
   if (typeof endpoint !== "string" || !endpoint) return;
-  await env.NEXTFLUX_PUSH.delete(await subscriptionKey(userId, endpoint));
+  // subscribe stores the URL-normalized endpoint, so an unsubscribe that posts
+  // the raw browser endpoint (uppercase host, explicit :443) must be
+  // normalized the same way or it deletes a key that does not exist.
+  let normalized;
+  try {
+    normalized = new URL(endpoint).toString();
+  } catch {
+    return;
+  }
+  await env.NEXTFLUX_PUSH.delete(await subscriptionKey(userId, normalized));
 }
 
 export async function pruneSubscriptions(env, userId, endpoints) {

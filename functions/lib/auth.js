@@ -21,6 +21,9 @@ export async function requireMinifluxUser(request, env) {
     response = await fetch(`${baseUrl.replace(/\/+$/, "")}/v1/me`, {
       headers,
       signal: AbortSignal.timeout(TIMEOUT_MS),
+      // Never follow a redirect: the Miniflux credentials must not be
+      // forwarded to whatever host a 3xx points at.
+      redirect: "manual",
     });
   } catch {
     return { ok: false, status: 502, error: "miniflux_unreachable" };

@@ -176,3 +176,26 @@ test("normalizeHiddenFeedIds keeps every valid id", async () => {
   const ids = Array.from({ length: 700 }, (_, index) => index + 1);
   assert.equal(normalizeHiddenFeedIds(ids).length, 700);
 });
+
+test("listSubscriptions returns every record so the save path can evict overflow", async () => {
+  const store = new Map();
+  const env = createEnv(store);
+  // Written directly to model records left behind by an older uncapped write.
+  for (let index = 0; index < 25; index += 1) {
+    const item = subscription({ endpoint: `https://fcm.googleapis.com/fcm/send/overflow${index}` });
+    store.set(await subscriptionKey(1, item.endpoint), JSON.stringify({ ...item, savedAt: index }));
+  }
+
+  assert.equal((await listSubscriptions(env, 1)).length, 25);
+});
+
+test("deleteSubscription normalizes the endpoint before deleting", async () => {
+  const env = createEnv();
+  await saveSubscription(env, 1, subscription());
+
+  // subscribe stored the URL-normalized endpoint, so a raw browser endpoint
+  // with an uppercase host and an explicit default port must still match it.
+  await deleteSubscription(env, 1, "https://FCM.GOOGLEAPIS.COM:443/fcm/send/abc123");
+
+  assert.equal((await listSubscriptions(env, 1)).length, 0);
+});

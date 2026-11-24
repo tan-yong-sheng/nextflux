@@ -30,6 +30,7 @@ test("an admin user passes the owner gate", async () => {
   assert.deepEqual(result, { ok: true, user: { id: 1, is_admin: true } });
   assert.equal(seen.url, "https://reader.example.com/v1/me");
   assert.equal(seen.init.headers["X-Auth-Token"], "secret");
+  assert.equal(seen.init.redirect, "manual");
 });
 
 test("a non-admin user is rejected as not_instance_owner", async () => {

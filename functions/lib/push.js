@@ -1,6 +1,9 @@
 import { buildPushPayload } from "@block65/webcrypto-web-push";
 
 const TTL_SECONDS = 60 * 60;
+// A stalled push service must not hold the webhook open until the platform
+// kills the request; a timeout surfaces as `failed:network`.
+const PUSH_TIMEOUT_MS = 10000;
 
 export function vapidKeys(env) {
   return {
@@ -34,7 +37,10 @@ export async function deliverPush(env, subscription, notice) {
   }
 
   try {
-    const response = await fetch(request.endpoint, request.init);
+    const response = await fetch(request.endpoint, {
+      ...request.init,
+      signal: AbortSignal.timeout(PUSH_TIMEOUT_MS),
+    });
     if (response.ok) return "sent";
     if (response.status === 404 || response.status === 410) return "gone";
     return `failed:${response.status}`;
