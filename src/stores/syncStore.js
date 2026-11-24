@@ -121,8 +121,10 @@ export function sync() {
     failures = 0;
     retryAfter = 0;
     // The server filters pushed notices with the hidden feeds this device
-    // reported, so the record has to follow the current visibility.
+    // reported, so the record has to follow the current visibility. The sync
+    // just rewrote the feed records; refresh before reading them.
     if (hasActivePushSubscription()) {
+      await loadFeeds();
       void syncPushHiddenFeeds();
     }
     if (runAllowsNotice) {

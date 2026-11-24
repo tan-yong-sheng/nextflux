@@ -26,6 +26,19 @@ test("only usable ids are reported", () => {
   assert.deepEqual(hiddenFeedIds(feeds), [5]);
 });
 
+test("only real feed ids are reported", () => {
+  const feeds = [
+    // Number(true) is 1 and Number("1.5") is 1.5; neither is a feed id.
+    { id: true, hide_globally: true },
+    { id: "1.5", hide_globally: true },
+    { id: -1, hide_globally: true },
+    { id: 2.5, hide_globally: true },
+    { id: "7", hide_globally: true },
+    { id: 8, hide_globally: true },
+  ];
+  assert.deepEqual(hiddenFeedIds(feeds), [7, 8]);
+});
+
 test("an empty feed list reports nothing", () => {
   assert.deepEqual(hiddenFeedIds([]), []);
 });

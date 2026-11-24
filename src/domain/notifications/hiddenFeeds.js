@@ -9,7 +9,12 @@
 export function hiddenFeedIds(feeds = [], showHiddenFeeds = false) {
   if (showHiddenFeeds) return [];
   return feeds
-    .filter((feed) => feed?.hide_globally && feed?.id !== null && feed?.id !== undefined)
-    .map((feed) => Number(feed?.id))
-    .filter((id) => Number.isInteger(id));
+    .map((feed) => {
+      if (!feed?.hide_globally) return null;
+      const id = feed?.id;
+      // Accept only real ids: Number() would turn true into 1 and "1.5" into 1.5.
+      const parsed = typeof id === "string" && /^\d+$/.test(id) ? Number(id) : id;
+      return Number.isInteger(parsed) && parsed >= 0 ? parsed : null;
+    })
+    .filter((id) => id !== null);
 }

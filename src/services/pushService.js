@@ -238,15 +238,20 @@ function sameKey(applicationServerKey, expected) {
  * Re-registering on every start also restores an endpoint the server pruned
  * after a 410 response.
  */
+// Enable and disable can overlap: a slow subscribe finishing after an
+// unsubscribe would silently re-register the device, so runs are chained.
+let stateQueue = Promise.resolve();
+
 export async function syncPushState(enabled) {
-  const run = (async () => {
+  const run = stateQueue.then(async () => {
     try {
       return enabled ? await subscribeToPush() : await unsubscribeFromPush();
     } catch (error) {
       reportError(error, "notifications.push");
       return "failed";
     }
-  })();
+  });
+  stateQueue = run.then(() => undefined);
   pendingRegistration = run;
   try {
     return await run;
