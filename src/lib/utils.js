@@ -1,5 +1,6 @@
 import { clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
+import { sanitizeArticleHtml } from "@/lib/sanitizeHtml.js";
 
 export function cn(...inputs) {
   return twMerge(clsx(inputs));
@@ -19,10 +20,14 @@ export function extractFirstImage(article) {
   }
 
   // 如果附件中没有图片，则从内容中查找
-  const div = document.createElement("div");
-  div.innerHTML = article.content;
+  // DOMParser does not run scripts or fetch resources, and the content is
+  // sanitized first: feed HTML is untrusted.
+  const doc = new DOMParser().parseFromString(
+    sanitizeArticleHtml(article.content),
+    "text/html",
+  );
 
-  const img = div.querySelector("img");
+  const img = doc.querySelector("img");
   return img ? img.src : null;
 }
 
@@ -78,13 +83,4 @@ export function extractTextFromHtml(html) {
       return entities[entity] || "";
     })
     .trim();
-}
-
-// 获取链接的hostname
-export function getHostname(href) {
-  try {
-    return new URL(href).hostname;
-  } catch {
-    return href;
-  }
 }
