@@ -57,12 +57,15 @@ function normalizeAllow(value) {
 let purify = null;
 
 // Created lazily so the sanitizer picks up the window that exists at call
-// time (browser, or a jsdom window installed by the tests).
+// time (browser, or a jsdom window installed by the tests). An unsupported
+// instance is not cached, so a window installed later is picked up.
 function getPurify() {
   if (purify) return purify;
   const win = typeof window !== "undefined" ? window : undefined;
-  purify = createDOMPurify(win);
-  purify.addHook("uponSanitizeAttribute", (node, data) => {
+  if (!win) return null;
+  const instance = createDOMPurify(win);
+  if (!instance.isSupported) return null;
+  instance.addHook("uponSanitizeAttribute", (node, data) => {
     if (node.nodeName !== "IFRAME" && IFRAME_ONLY_ATTRS.has(data.attrName)) {
       data.keepAttr = false;
       return;
@@ -76,14 +79,25 @@ function getPurify() {
       data.attrValue = allow;
     }
   });
+  purify = instance;
   return purify;
+}
+
+// Fallback for an environment without a DOM: drop the tags and the content
+// of the elements that carry executable or style payloads, then the rest of
+// the tags. The result is text, not markup.
+function stripMarkup(html) {
+  return String(html)
+    .replace(/<(script|style|iframe|object|embed|form)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, "")
+    .replace(/<(script|style|iframe|object|embed|form)\b[^>]*\/?>/gi, "")
+    .replace(/<[^>]*>/g, "");
 }
 
 export function sanitizeArticleHtml(html) {
   if (!html) return "";
   const domPurify = getPurify();
   // Without a DOM the sanitizer cannot do its job. Returning the raw HTML
-  // would hand untrusted markup straight to the renderer, so strip all tags.
-  if (!domPurify.isSupported) return String(html).replace(/<[^>]*>/g, "");
+  // would hand untrusted markup straight to the renderer, so strip it all.
+  if (!domPurify) return stripMarkup(html);
   return domPurify.sanitize(html, ARTICLE_SANITIZE_CONFIG);
 }
