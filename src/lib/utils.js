@@ -1,6 +1,6 @@
 import { clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
-import { sanitizeArticleHtml } from "@/lib/sanitizeHtml.js";
+import { sanitizeArticleHtml } from "./sanitizeHtml.js";
 
 export function cn(...inputs) {
   return twMerge(clsx(inputs));
@@ -20,8 +20,9 @@ export function extractFirstImage(article) {
   }
 
   // 如果附件中没有图片，则从内容中查找
-  // DOMParser does not run scripts or fetch resources, and the content is
-  // sanitized first: feed HTML is untrusted.
+  // Feed HTML is untrusted, so it is sanitized before it is parsed.
+  // DOMParser keeps scripts inert; it does not stop the browser from
+  // requesting images it finds, so this is not a network-free boundary.
   const doc = new DOMParser().parseFromString(
     sanitizeArticleHtml(article.content),
     "text/html",

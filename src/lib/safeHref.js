@@ -5,7 +5,7 @@ const SAFE_PROTOCOLS = new Set(["http:", "https:", "mailto:", "tel:"]);
 // Browsers strip tabs and newlines before parsing a URL, so "/\t/evil.com"
 // becomes "//evil.com". Strip control characters before any check.
 function normalizeHref(href) {
-  return href.replace(/[\u0000-\u001f\u007f]/g, "").trim();
+  return href.replace(/\p{Cc}/gu, "").trim();
 }
 
 function baseUrl() {
