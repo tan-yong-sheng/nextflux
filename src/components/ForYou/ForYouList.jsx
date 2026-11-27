@@ -8,6 +8,7 @@ import { db } from "@/db/database.js";
 import { isVisibleFeed } from "@/domain/articles/articleScope.js";
 import { settingsState } from "@/stores/settingsStore.js";
 import { filteredArticles } from "@/stores/articlesStore.js";
+import { useIsMedium } from "@/hooks/use-mobile.jsx";
 import {
   buildSignals,
   rankForYou,
@@ -16,6 +17,7 @@ import ArticleCard from "@/components/ArticleList/components/ArticleCard.jsx";
 import ReadingLayout from "@/components/ReadingLayout.jsx";
 import ArticleView from "@/components/ArticleView/ArticleView.jsx";
 import { ScrollArea } from "@/components/ui/scroll-area.jsx";
+import { cn } from "@/lib/utils";
 import { SidebarTrigger } from "@/components/ui/sidebar.jsx";
 import { Spinner } from "@/components/ui/spinner.jsx";
 
@@ -88,6 +90,9 @@ const READ_HISTORY_LIMIT = 500;
 
 export default function ForYouList() {
   const { articleId } = useParams();
+  const isMedium = useIsMedium();
+  // On medium screens the reader covers the list, which shifts out of the way.
+  const isArticleDetailOpen = isMedium && !!articleId;
   const { showHiddenFeeds } = useStore(settingsState);
   const articles = useLiveQuery(
     () => db.articles.where("status").equals("unread").toArray(),
@@ -128,7 +133,8 @@ export default function ForYouList() {
 
   // Keep articles that were already ranked even after they are read: marking
   // an article read while scrolling would otherwise drop it from the list
-  // under the cursor and break keyboard navigation.
+  // under the cursor and break keyboard navigation. See the merge below for
+  // when a read article is retained.
   const rankedRef = useRef(new Map());
 
   useEffect(() => {
@@ -160,11 +166,11 @@ export default function ForYouList() {
       const fresh = latest.get(id);
       if (!fresh || !visibleFeedIds.has(fresh.feedId)) continue;
       // Keep an article that is still unread even if it dropped out of the
-      // ranking, and keep the one being read, which the reader can still
-      // navigate to. Anything else is dropped so the list does not fill up
-      // with rows the reader already went past.
-      const isActive = String(fresh.id) === String(articleId);
-      if (fresh.status !== "unread" && !isActive) continue;
+      // ranking: scrolling marks articles read, and removing rows under the
+      // cursor breaks keyboard navigation. A read article is kept only while
+      // the mobile reader shows it, since that reader sits on top of the list.
+      const isOpenInReader = isMedium && String(fresh.id) === String(articleId);
+      if (fresh.status !== "unread" && !isOpenInReader) continue;
       merged.set(id, { ...item, article: fresh });
     }
     rankedRef.current = merged;
@@ -179,7 +185,7 @@ export default function ForYouList() {
       .slice(0, 50);
     setItems(ordered);
     setHasSignal(Boolean(signals.hasSignal));
-  }, [articles, starred, read, visibleFeedIds, isLoading, articleId]);
+  }, [articles, starred, read, visibleFeedIds, isLoading, articleId, isMedium]);
 
   // Keep the shared list in sync so keyboard navigation and the reader panel
   // follow the ranked order instead of the feed order.
@@ -193,7 +199,12 @@ export default function ForYouList() {
 
   return (
     <ReadingLayout reader={<ArticleView />}>
-      <div className="article-list-panel flex h-dvh w-full flex-col overflow-hidden">
+      <div
+        className={cn(
+          "article-list-panel flex h-dvh w-full flex-col overflow-hidden",
+          isArticleDetailOpen && "article-list-shifted",
+        )}
+      >
         <ForYouHeader count={items.length} hasSignal={hasSignal} />
         <div className="min-h-0 flex-1 overflow-hidden">
           {isLoading ? (

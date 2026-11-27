@@ -177,10 +177,12 @@ export default {
   },
   forYou: {
     title: "Pour vous",
-    summary: "{{count}} articles sélectionnés pour vous",
-    summaryWithoutSignal: "Marquez quelques articles pour obtenir des suggestions",
+    summary_one: "{{count}} article sélectionné pour vous",
+    summary_other: "{{count}} articles sélectionnés pour vous",
+    summaryWithoutSignal: "Mettez quelques articles en favoris pour obtenir des suggestions",
     oftenRead: "souvent lu",
-    empty: "Rien à recommander pour l’instant — marquez quelques articles pour remplir cette liste.",
+    empty:
+      "Rien à recommander pour l'instant - mettez quelques articles en favoris pour remplir cette liste.",
   },
   articleView: {
     fillViewport: "Passer en vue complète",
