@@ -174,6 +174,14 @@ export default {
       categoryNameRequired: "Please enter category title",
     },
   },
+  forYou: {
+    title: "For You",
+    summary_one: "{{count}} article picked for you",
+    summary_other: "{{count}} articles picked for you",
+    summaryWithoutSignal: "Star a few articles to get picks",
+    oftenRead: "often read",
+    empty: "Nothing to recommend yet — star a few articles and this fills up.",
+  },
   articleView: {
     fillViewport: "Enter full view",
     restoreViewport: "Exit full view",

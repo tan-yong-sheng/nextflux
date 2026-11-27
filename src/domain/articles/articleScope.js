@@ -1,5 +1,5 @@
-const isVisibleFeed = (feed, showHiddenFeeds) =>
-  showHiddenFeeds || !feed.hide_globally;
+export const isVisibleFeed = (feed, showHiddenFeeds) =>
+  showHiddenFeeds || !feed?.hide_globally;
 
 const parseScopeId = (id) =>
   id === null || id === undefined ? null : Number.parseInt(id, 10);

@@ -175,6 +175,15 @@ export default {
       categoryNameRequired: "Veuillez entrer le titre de la catégorie",
     },
   },
+  forYou: {
+    title: "Pour vous",
+    summary_one: "{{count}} article sélectionné pour vous",
+    summary_other: "{{count}} articles sélectionnés pour vous",
+    summaryWithoutSignal: "Mettez quelques articles en favoris pour obtenir des suggestions",
+    oftenRead: "souvent lu",
+    empty:
+      "Rien à recommander pour l'instant - mettez quelques articles en favoris pour remplir cette liste.",
+  },
   articleView: {
     fillViewport: "Passer en vue complète",
     restoreViewport: "Quitter la vue complète",

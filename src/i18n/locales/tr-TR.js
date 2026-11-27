@@ -175,6 +175,13 @@ export default {
       categoryNameRequired: "Lütfen kategori başlığını girin",
     },
   },
+  forYou: {
+    title: "Senin için",
+    summary: "Senin için {{count}} makale seçildi",
+    summaryWithoutSignal: "Öneri almak için birkaç makaleyi yıldızla",
+    oftenRead: "sık okunan",
+    empty: "Henüz öneri yok — birkaç makaleyi yıldızla, liste dolsun.",
+  },
   articleView: {
     fillViewport: "Tam görünüme geç",
     restoreViewport: "Tam görünümden çık",
