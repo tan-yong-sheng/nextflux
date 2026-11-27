@@ -152,3 +152,24 @@ test("rejects a document whose root is not opml", () => {
   assert.equal(isOPMLDocument(""), false);
   assert.equal(isOPMLDocument(undefined), false);
 });
+
+test("rejects a run of adjacent comments without backtracking", () => {
+  // `(?:<!--.*?-->)*` style validation explores every partition of this input
+  // and never finishes; the scan is linear.
+  const comments = "<!--x-->".repeat(5000);
+  const started = Date.now();
+  assert.equal(isOPMLDocument(comments), false);
+  assert.equal(
+    isOPMLDocument('<?xml version="1.0"?>' + comments + '<html></html>'),
+    false,
+  );
+  assert.equal(
+    isOPMLDocument('<?xml version="1.0"?>' + comments + '<opml><body></body></opml>'),
+    true,
+  );
+  assert.ok(Date.now() - started < 1000);
+});
+
+test("rejects an unterminated comment in the prologue", () => {
+  assert.equal(isOPMLDocument("<!--never closed<opml><body></body></opml>"), false);
+});

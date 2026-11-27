@@ -48,13 +48,24 @@ function fromCodePoint(code) {
  * True when the document's root element is `opml`. A wrapper around an
  * `<opml>` body is not an OPML export, and a self-closing `<opml/>` (an
  * export with no subscriptions) is one.
+ *
+ * The prologue is skipped by scanning, not with a `(?:<!--...-->)*` group:
+ * quantified lazy matches over adjacent comments backtrack combinatorially, so
+ * a crafted file would freeze the page.
  */
 export function isOPMLDocument(xml) {
-  const text = typeof xml === "string" ? xml : "";
-  const root = /^\s*(?:<\?xml[^>]*\?>\s*)?(?:<!--[\s\S]*?-->\s*)*<opml\b([^>]*)>/i.exec(text);
+  let rest = (typeof xml === "string" ? xml : "").trimStart();
+  const declaration = /^<\?xml\b[^>]*\?>/i.exec(rest);
+  if (declaration) rest = rest.slice(declaration[0].length).trimStart();
+  while (rest.startsWith("<!--")) {
+    const end = rest.indexOf("-->");
+    if (end === -1) return false;
+    rest = rest.slice(end + 3).trimStart();
+  }
+  const root = /^<opml\b([^>]*)>/i.exec(rest);
   if (!root) return false;
   if (/\/\s*$/.test(root[1])) return true;
-  return /<\/opml\s*>\s*$/i.test(text);
+  return /<\/opml\s*>\s*$/i.test(rest);
 }
 
 /**
