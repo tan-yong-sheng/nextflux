@@ -76,8 +76,9 @@ const Iframe = ({ domNode }) => {
         // Remote embeds are untrusted: no same-origin access to us (a
         // same-origin feed URL could otherwise reach this app's DOM through
         // allow-same-origin + allow-scripts and drop the sandbox), no
-        // top-navigation, no downloads. Scripts/popups stay so players work.
-        sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox"
+        // top-navigation, no downloads. Scripts/popups/fullscreen stay so
+        // players work (Bilibili requests allowFullScreen).
+        sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox allow-fullscreen"
         className={cn(
           "w-full border-0",
           isLoading ? "opacity-0" : "opacity-100",
