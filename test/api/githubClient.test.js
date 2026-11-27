@@ -145,7 +145,16 @@ test("commitFiles writes every file of the backup in one commit", async () => {
 
   assert.equal(result.commitSha, "new-commit");
   assert.equal(result.commitUrl, "https://github.com/o/r/commit/new-commit");
-  const treeRequest = requests.find((request) => request.url.endsWith("/git/trees"));
+  // The whole backup lands in a single commit: one tree, one commit, one ref update.
+  const treeRequests = requests.filter((request) =>
+    request.url.endsWith("/git/trees"),
+  );
+  const commitRequests = requests.filter((request) =>
+    request.url.endsWith("/git/commits"),
+  );
+  assert.equal(treeRequests.length, 1);
+  assert.equal(commitRequests.length, 1);
+  const treeRequest = treeRequests[0];
   assert.equal(treeRequest.method, "POST");
   assert.equal(treeRequest.body.base_tree, "tree-sha");
   assert.deepEqual(treeRequest.body.tree, [

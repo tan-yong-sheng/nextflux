@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 
 import {
   buildBackupPaths,
+  clearBackupConfig,
   DEFAULT_CONFIG,
   getBackupConfig,
   saveBackupConfig,
@@ -19,6 +20,9 @@ function withStorage(run) {
     run(store);
   } finally {
     delete globalThis.localStorage;
+    // Session tokens live outside localStorage; clear them so a token set by
+    // one test cannot leak into the next one.
+    clearBackupConfig(ACCOUNT);
   }
 }
 

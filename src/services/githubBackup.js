@@ -142,6 +142,11 @@ export async function previewRestore(
 
   const file = await github.readFile(settings.repo, opmlPath, { ref: commitSha });
   if (!file.found) throw new GitHubError(404, "versionMissing");
+  // A commit can carry any file at the backup path (someone may have put a
+  // README there). Reject a non-OPML body instead of restoring zero feeds.
+  if (!OPML_DOCUMENT.test(file.content || "")) {
+    throw new GitHubError(0, "invalidExport");
+  }
 
   const opml = parseOPML(file.content);
   const existingFeeds = await getFeeds();
@@ -165,7 +170,7 @@ export async function restoreAccount(
     feeds || {};
   // The preview already read the file and diffed it. Reusing that result
   // avoids a second round-trip to GitHub and to the Miniflux server.
-  const { opml, diff } =
+  let { opml, diff } =
     preparedOPML && preparedDiff
       ? { opml: preparedOPML, diff: preparedDiff }
       : await previewRestore(account, commitSha, {
@@ -173,6 +178,16 @@ export async function restoreAccount(
           client,
           feeds,
         });
+  // An empty preview diff may be stale: a feed can be unsubscribed between the
+  // preview and the confirm. Re-read the server list before declaring a no-op,
+  // otherwise those feeds are silently never restored.
+  if (diff.added.length === 0 && feeds?.getFeeds) {
+    const currentFeeds = await feeds.getFeeds();
+    diff = diffFeeds(
+      parseOPML(opml),
+      currentFeeds.map((feed) => feed.feed_url),
+    );
+  }
   if (diff.added.length === 0) {
     return { imported: false, diff };
   }

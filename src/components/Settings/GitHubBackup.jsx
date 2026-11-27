@@ -363,6 +363,7 @@ export default function GitHubBackup() {
             <div className="flex flex-col gap-3">
               <p className="text-sm text-muted-foreground">
                 {t(key("previewSummary"), {
+                  count: preview.diff.added.length,
                   added: preview.diff.added.length,
                   present: preview.diff.present.length,
                 })}
@@ -424,6 +425,7 @@ export default function GitHubBackup() {
                   variant="ghost"
                   size="sm"
                   onClick={() => setPreview(null)}
+                  disabled={Boolean(busy)}
                 >
                   {t(key("back"))}
                 </Button>

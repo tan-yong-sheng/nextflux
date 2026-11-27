@@ -32,6 +32,12 @@ function encodePath(path) {
     .join("/");
 }
 
+// A branch typed with stray whitespace must resolve to the same ref the UI
+// validates, otherwise every lookup misses.
+function trimBranch(branch) {
+  return typeof branch === "string" ? branch.trim() : "";
+}
+
 export function parseRepo(repo) {
   const value = String(repo ?? "").trim().replace(/\.git$/, "");
   const parts = value.split("/").filter(Boolean);
@@ -120,14 +126,13 @@ export class GitHubClient {
     const parsed = parseRepo(repo);
     if (!parsed) throw new GitHubError(0, "invalidRepo");
     const query = new URLSearchParams();
-    if (ref) query.set("ref", ref);
-    else if (branch) query.set("ref", branch);
+    const refName = ref || trimBranch(branch);
+    if (refName) query.set("ref", refName);
     const suffix = query.toString() ? `?${query}` : "";
+    const url = `${API_ROOT}/repos/${encodePath(parsed.fullName)}/contents/${encodePath(path)}${suffix}`;
 
     try {
-      const response = await this.request(
-        `${API_ROOT}/repos/${encodePath(parsed.fullName)}/contents/${encodePath(path)}${suffix}`,
-      );
+      const response = await this.request(url);
       const body = await response.json();
       return {
         found: true,
@@ -137,6 +142,20 @@ export class GitHubClient {
       };
     } catch (error) {
       if (error.status === 404) return { found: false };
+      // The Contents API refuses blobs above 1 MB. Reading the same URL with
+      // the raw media type returns the text without the base64 envelope, so
+      // a large OPML still backs up and restores.
+      if (error.status === 403 && /too_large/i.test(error.message || "")) {
+        const raw = await this.request(url, {
+          headers: { Accept: "application/vnd.github.raw" },
+        });
+        return {
+          found: true,
+          sha: null,
+          content: await raw.text(),
+          htmlUrl: null,
+        };
+      }
       throw error;
     }
   }
@@ -152,18 +171,26 @@ export class GitHubClient {
     const parsed = parseRepo(repo);
     if (!parsed) throw new GitHubError(0, "invalidRepo");
     const repoUrl = `${API_ROOT}/repos/${encodePath(parsed.fullName)}`;
+    const targetBranch = trimBranch(branch) || "main";
 
     // A brand-new repository has no branch to build the commit on. Its ref
     // lookup answers 404, and the first commit is created without a parent
-    // before a new branch is pointed at it.
+    // before a new branch is pointed at it. A repository that already has
+    // commits but not this branch is a configuration error: a parentless
+    // commit there would start an unrelated history.
     let baseCommitSha = null;
     try {
       const base = await this.request(
-        `${repoUrl}/git/ref/heads/${encodePath(branch)}`,
+        `${repoUrl}/git/ref/heads/${encodePath(targetBranch)}`,
       );
       baseCommitSha = (await base.json()).object?.sha || null;
     } catch (error) {
       if (error.status !== 404) throw error;
+      const repoResponse = await this.request(repoUrl);
+      const repoBody = await repoResponse.json();
+      if ((repoBody?.size || 0) > 0) {
+        throw new GitHubError(404, "branchMissing");
+      }
     }
 
     let baseTreeSha;
@@ -208,7 +235,7 @@ export class GitHubClient {
 
     const reference = await this.request(
       baseCommitSha
-        ? `${repoUrl}/git/refs/heads/${encodePath(branch)}`
+        ? `${repoUrl}/git/refs/heads/${encodePath(targetBranch)}`
         : `${repoUrl}/git/refs`,
       {
         method: baseCommitSha ? "PATCH" : "POST",
@@ -216,7 +243,7 @@ export class GitHubClient {
         body: JSON.stringify(
           baseCommitSha
             ? { sha: commitResult.sha, force: false }
-            : { ref: `refs/heads/${branch}`, sha: commitResult.sha },
+            : { ref: `refs/heads/${targetBranch}`, sha: commitResult.sha },
         ),
       },
     );
@@ -243,7 +270,7 @@ export class GitHubClient {
       per_page: String(perPage),
       page: String(page),
     });
-    if (branch) query.set("sha", branch);
+    if (trimBranch(branch)) query.set("sha", trimBranch(branch));
 
     const response = await this.request(
       `${API_ROOT}/repos/${encodePath(parsed.fullName)}/commits?${query}`,

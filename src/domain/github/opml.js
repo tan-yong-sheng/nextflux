@@ -24,9 +24,18 @@ function decodeEntities(value) {
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
     .replace(/&quot;/g, '"')
-    .replace(/&#0?39;/g, "'")
     .replace(/&apos;/g, "'")
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, hex) => fromCodePoint(parseInt(hex, 16)))
+    .replace(/&#(\d+);/g, (_, decimal) => fromCodePoint(Number(decimal)))
     .replace(/&amp;/g, "&");
+}
+
+// Numeric references cover the characters OPML writers escape most often
+// (apostrophes, non-ASCII titles); an invalid code point decodes to nothing.
+function fromCodePoint(code) {
+  return Number.isInteger(code) && code > 0 && code <= 0x10ffff
+    ? String.fromCodePoint(code)
+    : "";
 }
 
 /**
