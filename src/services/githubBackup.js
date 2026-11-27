@@ -14,15 +14,12 @@ import { accountBackupKey } from "../domain/github/accountKey.js";
 import {
   buildBackupMeta,
   diffFeeds,
+  isOPMLDocument,
   parseOPML,
 } from "../domain/github/opml.js";
 import { buildBackupPaths, getBackupConfig } from "./githubBackupConfig.js";
 
 export { GitHubError };
-
-// A Miniflux export is an OPML document. Anything else (an empty body, an
-// HTML error page) is a failed export, not a subscription list with no feeds.
-const OPML_DOCUMENT = /<opml\b[^>]*>[\s\S]*<\/opml>/i;
 
 export const missingFeedApi = () => {
   throw new GitHubError(0, "missingFeedApi");
@@ -57,7 +54,7 @@ export async function backupAccount(account, { config, client, feeds } = {}) {
   const { opmlPath, metaPath } = await resolvePaths(account, settings);
 
   const opml = await exportOPML();
-  if (typeof opml !== "string" || !OPML_DOCUMENT.test(opml)) {
+  if (typeof opml !== "string" || !isOPMLDocument(opml)) {
     throw new GitHubError(0, "invalidExport");
   }
   const parsed = parseOPML(opml);
@@ -144,7 +141,7 @@ export async function previewRestore(
   if (!file.found) throw new GitHubError(404, "versionMissing");
   // A commit can carry any file at the backup path (someone may have put a
   // README there). Reject a non-OPML body instead of restoring zero feeds.
-  if (!OPML_DOCUMENT.test(file.content || "")) {
+  if (!isOPMLDocument(file.content || "")) {
     throw new GitHubError(0, "invalidExport");
   }
 

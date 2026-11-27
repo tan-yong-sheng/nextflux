@@ -74,10 +74,11 @@ export function saveBackupConfig(account, changes) {
   try {
     localStorage.setItem(storageKey(account), JSON.stringify(persisted));
     memoryConfigs.delete(account?.id);
-  } catch {
+  } catch (error) {
     // Storage may be unavailable (quota or private mode). Keep the effective
     // config in memory so this session still works and a later read does not
     // silently fall back to the defaults.
+    reportError(error, "backup.github.config.write");
     memoryConfigs.set(account?.id, persisted);
   }
 
@@ -96,10 +97,11 @@ export function clearBackupConfig(account) {
 
 export function buildBackupPaths(account, config, accountKey) {
   // Drop empty, current and parent segments: a pathPrefix must stay inside the
-  // repository, so it cannot climb out through ".." segments.
+  // repository, so it cannot climb out through ".." segments. Segments are not
+  // trimmed: an existing prefix with spaces keeps its folder instead of
+  // silently starting a new one.
   const prefix = String(config.pathPrefix || "")
     .split("/")
-    .map((segment) => segment.trim())
     .filter((segment) => segment && segment !== "." && segment !== "..")
     .join("/");
   const segments = [prefix, accountKey, "subscriptions.opml"].filter(Boolean);

@@ -195,6 +195,10 @@ test("commitFiles initializes a brand-new repository without a parent", async ()
       if (url.includes("/git/ref/heads/")) {
         return jsonResponse({ message: "Not Found" }, { status: 404 });
       }
+      if (url.includes("/commits?per_page=1")) {
+        // An empty repository answers 409 "Git Repository is empty".
+        return jsonResponse({ message: "Git Repository is empty." }, { status: 409 });
+      }
       if (url.endsWith("/git/trees")) {
         return jsonResponse({ sha: "new-tree" });
       }
@@ -283,5 +287,37 @@ test("a network failure is reported as an offline error", async () => {
       assert.equal(error.code, "offline");
       return true;
     },
+  );
+});
+
+test("commitFiles refuses a missing branch on a repository that has commits", async () => {
+  const requests = [];
+  const client = new GitHubClient({
+    token: "t",
+    fetchImpl: async (url, options = {}) => {
+      requests.push({ url, method: options.method || "GET" });
+      if (url.includes("/git/ref/heads/")) {
+        return jsonResponse({ message: "Not Found" }, { status: 404 });
+      }
+      if (url.includes("/commits?per_page=1")) {
+        // The repository has commits, so the branch name is wrong.
+        return jsonResponse([{ sha: "existing" }]);
+      }
+      return jsonResponse({});
+    },
+  });
+
+  await assert.rejects(
+    () =>
+      client.commitFiles("o/r", {
+        branch: "missing",
+        message: "backup",
+        files: [{ path: "a.opml", content: "<opml/>" }],
+      }),
+    (error) => error?.status === 404 && error?.code === "branchMissing",
+  );
+  assert.equal(
+    requests.some((request) => request.url.endsWith("/git/commits") && request.method === "POST"),
+    false,
   );
 });

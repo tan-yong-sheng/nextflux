@@ -30,7 +30,7 @@ function makeClient(overrides = {}) {
     readFile: async (repo, path, options) => {
       calls.push({ method: "readFile", repo, path, options });
       if (options?.ref) {
-        return { found: true, sha: "blob", content: OPML };
+        return { found: true, sha: "blob", content: overrides.refContent ?? OPML };
       }
       return overrides.existing ?? { found: false };
     },
@@ -229,4 +229,64 @@ test("the stored path is derived from the account key", async () => {
   const path = client.calls[0].path;
   assert.equal(path.startsWith("nextflux/"), true);
   assert.equal(path.includes("miniflux.example.com"), false);
+});
+
+test("preview rejects a stored file that is not an OPML export", async () => {
+  const client = makeClient({ refContent: "<html>not a backup</html>" });
+  await assert.rejects(
+    () =>
+      previewRestore(ACCOUNT, "sha1", {
+        config: CONFIG,
+        client,
+        feeds: { getFeeds: async () => [] },
+      }),
+    (error) => error?.code === "invalidExport",
+  );
+});
+
+test("restore re-diffs when a stale preview diff looked empty", async () => {
+  const imported = [];
+  const client = makeClient();
+  let getFeedsCalls = 0;
+  const result = await restoreAccount(ACCOUNT, "sha1", {
+    config: CONFIG,
+    client,
+    opml: OPML,
+    // A feed was unsubscribed after the preview, so this is no longer current.
+    diff: { added: [], present: [] },
+    feeds: {
+      getFeeds: async () => {
+        getFeedsCalls += 1;
+        return [{ feed_url: "https://a.com/f" }];
+      },
+      importOPMLText: async (opml) => imported.push(opml),
+      refreshAllFeeds: async () => imported.push("refresh"),
+    },
+  });
+  assert.equal(getFeedsCalls, 1);
+  assert.equal(imported.length, 2);
+  assert.equal(result.imported, true);
+  assert.equal(result.diff.added.length, 1);
+  assert.equal(result.diff.added[0].url, "https://b.com/f");
+});
+
+test("restore skips the import when a fresh diff has nothing to add", async () => {
+  const imported = [];
+  const client = makeClient();
+  const result = await restoreAccount(ACCOUNT, "sha1", {
+    config: CONFIG,
+    client,
+    opml: OPML,
+    diff: { added: [], present: [] },
+    feeds: {
+      getFeeds: async () => [
+        { feed_url: "https://a.com/f" },
+        { feed_url: "https://b.com/f" },
+      ],
+      importOPMLText: async (opml) => imported.push(opml),
+      refreshAllFeeds: async () => imported.push("refresh"),
+    },
+  });
+  assert.equal(result.imported, false);
+  assert.equal(imported.length, 0);
 });

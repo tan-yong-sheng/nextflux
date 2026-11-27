@@ -145,7 +145,9 @@ export class GitHubClient {
       // The Contents API refuses blobs above 1 MB. Reading the same URL with
       // the raw media type returns the text without the base64 envelope, so
       // a large OPML still backs up and restores.
-      if (error.status === 403 && /too_large/i.test(error.message || "")) {
+      // GitHub words this as "the requested blob is too large"; `too_large`
+      // only appears as a nested error code that request() does not surface.
+      if (error.status === 403 && /too[_ ]large/i.test(error.message || "")) {
         const raw = await this.request(url, {
           headers: { Accept: "application/vnd.github.raw" },
         });
@@ -186,11 +188,18 @@ export class GitHubClient {
       baseCommitSha = (await base.json()).object?.sha || null;
     } catch (error) {
       if (error.status !== 404) throw error;
-      const repoResponse = await this.request(repoUrl);
-      const repoBody = await repoResponse.json();
-      if ((repoBody?.size || 0) > 0) {
-        throw new GitHubError(404, "branchMissing");
+      // `size` is a kilobyte counter that reports 0 for a small repository
+      // that already has commits, so ask for a commit instead: an empty
+      // repository answers 409 "Git Repository is empty", anything else
+      // means the branch name is wrong.
+      let empty = false;
+      try {
+        await this.request(`${repoUrl}/commits?per_page=1`);
+      } catch (commitsError) {
+        if (commitsError.status !== 409) throw commitsError;
+        empty = true;
       }
+      if (!empty) throw new GitHubError(404, "branchMissing");
     }
 
     let baseTreeSha;
