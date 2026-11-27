@@ -11,6 +11,9 @@ import { reportError } from "../lib/errors.js";
 
 const STORAGE_SUFFIX = "githubBackup:v1";
 const sessionTokens = new Map();
+// When localStorage refuses a write (quota, private mode), the effective
+// config lives here for the session instead of being lost on the next read.
+const memoryConfigs = new Map();
 
 export const DEFAULT_CONFIG = {
   repo: "",
@@ -44,11 +47,13 @@ function readStored(account) {
 
 export function getBackupConfig(account) {
   const stored = readStored(account);
-  if (stored.rememberToken && stored.token) {
-    sessionTokens.set(account?.id, stored.token);
+  const memory = memoryConfigs.get(account?.id);
+  const effective = memory ? { ...stored, ...memory } : stored;
+  if (effective.rememberToken && effective.token) {
+    sessionTokens.set(account?.id, effective.token);
   }
   return {
-    ...stored,
+    ...effective,
     token: sessionTokens.get(account?.id) || "",
   };
 }
@@ -68,8 +73,13 @@ export function saveBackupConfig(account, changes) {
 
   try {
     localStorage.setItem(storageKey(account), JSON.stringify(persisted));
-  } catch {
-    // Storage may be unavailable (private mode); the in-memory config still works.
+    memoryConfigs.delete(account?.id);
+  } catch (error) {
+    // Storage may be unavailable (quota or private mode). Keep the effective
+    // config in memory so this session still works and a later read does not
+    // silently fall back to the defaults.
+    reportError(error, "backup.github.config.write");
+    memoryConfigs.set(account?.id, persisted);
   }
 
   return { ...next, token: sessionTokens.get(account?.id) || "" };
@@ -77,6 +87,7 @@ export function saveBackupConfig(account, changes) {
 
 export function clearBackupConfig(account) {
   sessionTokens.delete(account?.id);
+  memoryConfigs.delete(account?.id);
   try {
     localStorage.removeItem(storageKey(account));
   } catch {
@@ -85,7 +96,14 @@ export function clearBackupConfig(account) {
 }
 
 export function buildBackupPaths(account, config, accountKey) {
-  const prefix = (config.pathPrefix || "").replace(/^\/+|\/+$/g, "");
+  // Drop empty, current and parent segments: a pathPrefix must stay inside the
+  // repository, so it cannot climb out through ".." segments. Segments are not
+  // trimmed: an existing prefix with spaces keeps its folder instead of
+  // silently starting a new one.
+  const prefix = String(config.pathPrefix || "")
+    .split("/")
+    .filter((segment) => segment && segment !== "." && segment !== "..")
+    .join("/");
   const segments = [prefix, accountKey, "subscriptions.opml"].filter(Boolean);
   return {
     opmlPath: segments.join("/"),

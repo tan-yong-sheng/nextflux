@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import {
   buildBackupMeta,
   diffFeeds,
+  isOPMLDocument,
   parseOPML,
 } from "../../src/domain/github/opml.js";
 
@@ -106,4 +107,69 @@ test("the metadata stores only the host of the Miniflux URL", () => {
   assert.equal(meta.host, "miniflux.example.com");
   assert.equal(JSON.stringify(meta).includes("secret"), false);
   assert.equal(JSON.stringify(meta).includes(":8080"), false);
+});
+
+test("decodes named, decimal and hexadecimal character references", () => {
+  const { feeds } = parseOPML(
+    '<opml><body><outline title="It&#39;s" text="caf&#xE9;" xmlUrl="https://a.com/?a=&#48;&amp;b=1" /></body></opml>',
+  );
+  assert.equal(feeds[0].title, "It's");
+  assert.equal(feeds[0].url, "https://a.com/?a=0&b=1");
+  assert.equal(
+    parseOPML('<opml><body><outline title="&quot;q&quot; &apos;a&apos;" xmlUrl="https://a.com/f" /></body></opml>')
+      .feeds[0].title,
+    '"q" \'a\'',
+  );
+});
+
+test("decodes character references in one pass", () => {
+  const { feeds } = parseOPML(
+    '<opml><body><outline title="&#38;amp;" xmlUrl="https://a.com/f" /></body></opml>',
+  );
+  // The escaped ampersand stays escaped instead of becoming a bare "&".
+  assert.equal(feeds[0].title, "&amp;");
+});
+
+test("drops out-of-range and surrogate character references", () => {
+  const { feeds } = parseOPML(
+    '<opml><body><outline title="a&#x110000;b&#xD800;c" xmlUrl="https://a.com/f" /></body></opml>',
+  );
+  assert.equal(feeds[0].title, "abc");
+});
+
+test("accepts an OPML root and an empty self-closing export", () => {
+  assert.equal(isOPMLDocument(OPML), true);
+  assert.equal(isOPMLDocument('<?xml version="1.0"?>\n<opml version="2.0" />'), true);
+  assert.equal(isOPMLDocument('<opml><body><outline text="x"/></body></opml>\n\n'), true);
+});
+
+test("rejects a document whose root is not opml", () => {
+  assert.equal(isOPMLDocument("<html>error</html>"), false);
+  assert.equal(
+    isOPMLDocument('<div><opml version="2.0"><body></body></opml></div>'),
+    false,
+  );
+  assert.equal(isOPMLDocument(""), false);
+  assert.equal(isOPMLDocument(undefined), false);
+});
+
+test("rejects a run of adjacent comments without backtracking", () => {
+  // `(?:<!--.*?-->)*` style validation explores every partition of this input
+  // and never finishes; the scan is linear.
+  const comments = "<!--x-->".repeat(5000);
+  const started = Date.now();
+  assert.equal(isOPMLDocument(comments), false);
+  assert.equal(
+    isOPMLDocument('<?xml version="1.0"?>' + comments + '<html></html>'),
+    false,
+  );
+  assert.equal(
+    isOPMLDocument('<?xml version="1.0"?>' + comments + '<opml><body></body></opml>'),
+    true,
+  );
+  assert.ok(Date.now() - started < 1000);
+});
+
+test("rejects an unterminated comment in the prologue", () => {
+  assert.equal(isOPMLDocument("<!--never closed<opml><body></body></opml>"), false);
 });

@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 
 import {
   buildBackupPaths,
+  clearBackupConfig,
   DEFAULT_CONFIG,
   getBackupConfig,
   saveBackupConfig,
@@ -19,6 +20,9 @@ function withStorage(run) {
     run(store);
   } finally {
     delete globalThis.localStorage;
+    // Session tokens live outside localStorage; clear them so a token set by
+    // one test cannot leak into the next one.
+    clearBackupConfig(ACCOUNT);
   }
 }
 
@@ -91,4 +95,38 @@ test("builds the backup paths from the prefix and the account key", () => {
 test("builds the backup paths without a prefix", () => {
   const paths = buildBackupPaths(ACCOUNT, { pathPrefix: "" }, "KEY123");
   assert.equal(paths.opmlPath, "KEY123/subscriptions.opml");
+});
+
+test("keeps the config in memory when storage refuses the write", () => {
+  globalThis.localStorage = {
+    getItem: () => null,
+    setItem: () => {
+      throw new Error("QuotaExceededError");
+    },
+    removeItem: () => {},
+  };
+  try {
+    saveBackupConfig(ACCOUNT, { repo: "o/r", branch: "trunk", pathPrefix: "b" });
+    const config = getBackupConfig(ACCOUNT);
+    assert.equal(config.repo, "o/r");
+    assert.equal(config.branch, "trunk");
+    assert.equal(config.pathPrefix, "b");
+  } finally {
+    delete globalThis.localStorage;
+    clearBackupConfig(ACCOUNT);
+  }
+});
+
+test("drops dot segments from the prefix so it cannot leave the repository", () => {
+  const paths = buildBackupPaths(
+    ACCOUNT,
+    { pathPrefix: ".././inner//../nextflux" },
+    "KEY123",
+  );
+  assert.equal(paths.opmlPath, "inner/nextflux/KEY123/subscriptions.opml");
+});
+
+test("keeps the spaces of an existing prefix instead of moving the folder", () => {
+  const paths = buildBackupPaths(ACCOUNT, { pathPrefix: " my backups " }, "KEY123");
+  assert.equal(paths.opmlPath, " my backups /KEY123/subscriptions.opml");
 });

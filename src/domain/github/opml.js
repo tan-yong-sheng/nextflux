@@ -19,14 +19,53 @@ function parseAttributes(source) {
   return attributes;
 }
 
+const ENTITY = /&(?:#x([0-9a-fA-F]+)|#(\d+)|(lt|gt|quot|apos|amp));/g;
+const NAMED_ENTITIES = { lt: "<", gt: ">", quot: '"', apos: "'", amp: "&" };
+
 function decodeEntities(value) {
-  return value
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&#0?39;/g, "'")
-    .replace(/&apos;/g, "'")
-    .replace(/&amp;/g, "&");
+  // One pass only: decoding `&#38;amp;` twice would turn an escaped literal
+  // ampersand into a real one and change the text.
+  return value.replace(ENTITY, (match, hex, decimal, named) => {
+    if (named) return NAMED_ENTITIES[named];
+    return fromCodePoint(hex ? parseInt(hex, 16) : Number(decimal));
+  });
+}
+
+// Numeric references cover the characters OPML writers escape most often
+// (apostrophes, non-ASCII titles); an invalid code point decodes to nothing.
+// Surrogate code points are excluded: on their own they are not characters
+// and String.fromCodePoint would emit a lone surrogate.
+function fromCodePoint(code) {
+  const valid =
+    Number.isInteger(code) &&
+    code > 0 &&
+    code <= 0x10ffff &&
+    (code < 0xd800 || code > 0xdfff);
+  return valid ? String.fromCodePoint(code) : "";
+}
+
+/**
+ * True when the document's root element is `opml`. A wrapper around an
+ * `<opml>` body is not an OPML export, and a self-closing `<opml/>` (an
+ * export with no subscriptions) is one.
+ *
+ * The prologue is skipped by scanning, not with a `(?:<!--...-->)*` group:
+ * quantified lazy matches over adjacent comments backtrack combinatorially, so
+ * a crafted file would freeze the page.
+ */
+export function isOPMLDocument(xml) {
+  let rest = (typeof xml === "string" ? xml : "").trimStart();
+  const declaration = /^<\?xml\b[^>]*\?>/i.exec(rest);
+  if (declaration) rest = rest.slice(declaration[0].length).trimStart();
+  while (rest.startsWith("<!--")) {
+    const end = rest.indexOf("-->");
+    if (end === -1) return false;
+    rest = rest.slice(end + 3).trimStart();
+  }
+  const root = /^<opml\b([^>]*)>/i.exec(rest);
+  if (!root) return false;
+  if (/\/\s*$/.test(root[1])) return true;
+  return /<\/opml\s*>\s*$/i.test(rest);
 }
 
 /**
