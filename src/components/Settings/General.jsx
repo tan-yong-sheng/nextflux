@@ -25,6 +25,7 @@ import {
   requestNotificationPermission,
   supportsNotifications,
 } from "@/services/notificationService";
+import { syncPushState } from "@/services/pushService";
 import { toast } from "sonner";
 export default function General() {
   const {
@@ -41,6 +42,11 @@ export default function General() {
   const toggleNotifications = async (checked) => {
     if (!checked) {
       updateSettings({ notifyNewArticles: false });
+      const result = await syncPushState(false);
+      // The server may still hold this endpoint; say so instead of pretending.
+      if (result === "failed") {
+        toast.error(t("settings.general.notifyDisableFailed"));
+      }
       return;
     }
     if (!supportsNotifications()) {
@@ -54,6 +60,16 @@ export default function General() {
     }
     if (permission !== "granted") return;
     updateSettings({ notifyNewArticles: true });
+    // Self-hosted builds have no push endpoint; the sync-driven system
+    // notification still covers the case where the app's tab is visible.
+    const result = await syncPushState(true);
+    // A hosted build can refuse the subscription, so the reader has to know
+    // that the switch is on without any background push behind it. A
+    // self-hosted build reports "unconfigured" on purpose: the sync-driven
+    // notice is the supported fallback there.
+    if (result === "failed") {
+      toast.error(t("settings.general.notifyEnableFailed"));
+    }
   };
   return (
     <>

@@ -2,6 +2,9 @@ import "./i18n";
 import PwaUpdates from "@/components/Pwa/PwaUpdates";
 import SessionNotices from "@/components/SessionNotices";
 import { initTheme } from "@/stores/themeStore";
+import { syncPushState } from "@/services/pushService";
+import { settingsState } from "@/stores/settingsStore";
+import { sessionAccount } from "@/stores/authStore";
 import { createRoot } from "react-dom/client";
 import "./index.css";
 import { router } from "@/routes/index.jsx";
@@ -18,6 +21,10 @@ import {
 
 // 初始化主题
 initTheme();
+
+// An enabled setting also re-registers this device once an account is signed
+// in, covering key or endpoint changes.
+if (settingsState.get().notifyNewArticles && sessionAccount) void syncPushState(true);
 
 createRoot(document.getElementById("root")).render(
   <TooltipProvider>

@@ -16,6 +16,11 @@ import {
   notificationPermission,
   showNewArticles,
 } from "@/services/notificationService.js";
+import {
+  awaitPushRegistration,
+  hasActivePushSubscription,
+  syncPushHiddenFeeds,
+} from "@/services/pushService.js";
 
 import { sessionAccount } from "@/stores/authStore.js";
 import { accountStorageKey } from "@/domain/auth/accounts.js";
@@ -84,15 +89,23 @@ export function sync() {
   error.set(null);
   syncProgress.set({ phase: "loading", received: 0 });
   const settings = settingsState.get();
-  const runAllowsNotice = notificationRunEnabled({
-    enabled: settings.notifyNewArticles,
-    permission: notificationPermission(),
-    hadPreviousSync: Boolean(getLastSyncTime()),
-    historyComplete: isHistorySyncComplete(),
-  });
+  let runAllowsNotice = false;
   const newArticles = [];
   const synchronize = async () => {
     signal.throwIfAborted();
+    // Wait for the startup push registration: a device that is about to become
+    // push-enabled must not also raise a local notice for the same articles.
+    await awaitPushRegistration();
+    // A device with a push subscription is notified by the server, so the sync
+    // run stays quiet to avoid announcing the same articles twice.
+    runAllowsNotice =
+      !hasActivePushSubscription() &&
+      notificationRunEnabled({
+        enabled: settings.notifyNewArticles,
+        permission: notificationPermission(),
+        hadPreviousSync: Boolean(getLastSyncTime()),
+        historyComplete: isHistorySyncComplete(),
+      });
     const result = await syncService.synchronize({
       signal,
       onBatch: ({ articles, added }) => {
@@ -107,6 +120,13 @@ export function sync() {
     lastSync.set(result);
     failures = 0;
     retryAfter = 0;
+    // The server filters pushed notices with the hidden feeds this device
+    // reported, so the record has to follow the current visibility. The sync
+    // just rewrote the feed records; refresh before reading them.
+    if (hasActivePushSubscription()) {
+      await loadFeeds();
+      void syncPushHiddenFeeds();
+    }
     if (runAllowsNotice) {
       const candidates = mergeNoticeCandidates(
         pendingNoticeArticles.get(),

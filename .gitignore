@@ -21,3 +21,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Local Cloudflare state and secret values
+.wrangler
+.env
+.dev.vars

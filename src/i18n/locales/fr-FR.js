@@ -365,7 +365,11 @@ export default {
       sync1hour: "Toutes les heures",
       notifyNewArticles: "Notifications de nouveaux articles",
       notifyNewArticlesDescription:
-        "Notifier lorsque Nextflux est ouvert. Les notifications lorsque l’application est fermée ne sont pas encore prises en charge.",
+        "Afficher une notification système à l'arrivée de nouveaux articles. Nécessite Web Push sur ce déploiement ; sur iPhone et iPad, ajoutez d'abord Nextflux à l'écran d'accueil.",
+      notifyDisableFailed:
+        "Impossible de désactiver les notifications sur le serveur. Réessayez.",
+      notifyEnableFailed:
+        "Impossible d'activer les notifications sur le serveur. Réessayez.",
       notifyDenied:
         "L'autorisation de notification a été refusée. Autorisez les notifications pour Nextflux dans les réglages du navigateur ou du système.",
       notifyUnsupported: "Ce navigateur ne prend pas en charge les notifications.",

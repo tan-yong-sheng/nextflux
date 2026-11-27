@@ -362,7 +362,11 @@ export default {
       sync1hour: "Every hour",
       notifyNewArticles: "New article notifications",
       notifyNewArticlesDescription:
-        "Notify while Nextflux is open. Closed-app push is not supported yet.",
+        "Show a system notification when new articles arrive. Requires Web Push on this deployment; on iPhone and iPad, add Nextflux to the Home Screen first.",
+      notifyDisableFailed:
+        "Notifications could not be turned off on the server. Try again.",
+      notifyEnableFailed:
+        "Notifications could not be enabled on the server. Try again.",
       notifyDenied:
         "Notification permission was denied. Allow notifications for Nextflux in your browser or system settings.",
       notifyUnsupported: "This browser does not support notifications.",

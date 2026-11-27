@@ -1,4 +1,6 @@
 // Pure rules for the new-article notification, kept out of browser code.
+import { hiddenFeedIds } from "./hiddenFeeds.js";
+
 export const NOTICE_TITLE_LIMIT = 3;
 
 /**
@@ -31,18 +33,16 @@ export function collectNewArticleNotice(
 ) {
   if (!articles?.length) return null;
   const feedIds = new Set(feeds.map((feed) => String(feed.id)));
-  const hiddenFeedIds = showHiddenFeeds
+  // The same rule the device reports to the push server, so a pushed notice
+  // and a local one hide exactly the same feeds.
+  const hidden = showHiddenFeeds
     ? null
-    : new Set(
-        feeds
-          .filter((feed) => feed.hide_globally)
-          .map((feed) => String(feed.id)),
-      );
+    : new Set(hiddenFeedIds(feeds).map((id) => String(id)));
   const relevant = articles.filter(
     (article) =>
       article.status === "unread" &&
       feedIds.has(String(article.feedId)) &&
-      !hiddenFeedIds?.has(String(article.feedId)),
+      !hidden?.has(String(article.feedId)),
   );
   if (!relevant.length) return null;
   return {
