@@ -1,6 +1,18 @@
 import { useMemo, useState } from "react";
 import { cn } from "@/lib/utils.js";
 
+// A same-origin iframe can reach this app's DOM through the sandbox
+// (allow-same-origin + allow-scripts), so never embed one.
+function isSameOriginSrc(url) {
+  try {
+    return (
+      new URL(url, window.location.href).origin === window.location.origin
+    );
+  } catch {
+    return false;
+  }
+}
+
 /**
  * 处理文章内容中的iframe，支持特殊平台（如Bilibili）的适配
  * @param {Object} props
@@ -26,11 +38,12 @@ const Iframe = ({ domNode }) => {
     // 判断是否为 Bilibili iframe
     const isBilibili = src && src.includes("bilibili");
 
+    let result;
     if (isBilibili) {
       // 获取bilibili视频 bvid
       const bvid = src.match(/bvid=([^&]+)/)?.[1];
       if (bvid) {
-        return {
+        result = {
           iframeProps: { allowFullScreen: true, ...attribs },
           finalSrc: `//bilibili.com/blackboard/html5mobileplayer.html?isOutside=true&bvid=${bvid}&p=1&hideCoverInfo=1&danmaku=0`,
         };
@@ -38,7 +51,12 @@ const Iframe = ({ domNode }) => {
     }
 
     // 默认返回原始iframe（带referrerpolicy）
-    return { iframeProps: attribs, finalSrc: src };
+    result ??= { iframeProps: attribs, finalSrc: src };
+
+    if (result.finalSrc && isSameOriginSrc(result.finalSrc)) {
+      return { iframeProps: null, finalSrc: null };
+    }
+    return result;
   }, [domNode]);
 
   if (!iframeProps || !finalSrc) {
@@ -55,6 +73,12 @@ const Iframe = ({ domNode }) => {
       <iframe
         src={finalSrc}
         {...iframeProps}
+        // Remote embeds are untrusted: no same-origin access to us (a
+        // same-origin feed URL could otherwise reach this app's DOM through
+        // allow-same-origin + allow-scripts and drop the sandbox), no
+        // top-navigation, no downloads. Scripts/popups/fullscreen stay so
+        // players work (Bilibili requests allowFullScreen).
+        sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox allow-fullscreen"
         className={cn(
           "w-full border-0",
           isLoading ? "opacity-0" : "opacity-100",

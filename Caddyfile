@@ -11,5 +11,12 @@ route {
 	@manifest path /*.webmanifest
 	header @manifest Content-Type "application/manifest+json"
 
+	# Security headers (modern-web-guidance security guide).
+	# script-src hash covers the inline theme script in index.html; regenerate
+	# it (sha256 of the <script> body, base64) whenever that script changes.
+	header Content-Security-Policy "default-src 'self'; script-src 'self' 'sha256-GOU3vqT3irH3r6cEoyblZBXVnyw51SfFgjIdMkWVXHc=' https://www.youtube.com/iframe_api; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; img-src 'self' data: https: http: blob:; media-src 'self' https: http: data: blob:; connect-src 'self' https: http: wss:; font-src 'self' data: https://fonts.gstatic.com https://cdn.jsdelivr.net; worker-src 'self' blob:; manifest-src 'self'; frame-src https: http:; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
+	header X-Content-Type-Options "nosniff"
+	header Referrer-Policy "strict-origin-when-cross-origin"
+
 	file_server
 }

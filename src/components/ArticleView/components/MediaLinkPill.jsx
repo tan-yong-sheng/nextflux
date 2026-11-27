@@ -1,9 +1,9 @@
 import { ArrowUpRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { getHostname } from "@/lib/utils.js";
+import { isSafeHref, getLinkLabel } from "@/lib/safeHref.js";
 
 export default function MediaLinkPill({ href }) {
-  if (!href) return null;
+  if (!isSafeHref(href)) return null;
   return (
     <div className="flex justify-center">
       <Badge
@@ -11,7 +11,7 @@ export default function MediaLinkPill({ href }) {
         variant="secondary"
         render={<a href={href} target="_blank" rel="noopener noreferrer" />}
       >
-        {getHostname(href)}
+        {getLinkLabel(href)}
         <ArrowUpRight />
       </Badge>
     </div>

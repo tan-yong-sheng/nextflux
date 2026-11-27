@@ -17,6 +17,7 @@ import {
 } from "@/domain/articles/articleMedia.js";
 import { imageGalleryActive } from "@/stores/articlesStore.js";
 import { cn, getFontSizeClass } from "@/lib/utils.js";
+import { sanitizeArticleHtml } from "@/lib/sanitizeHtml.js";
 import {
   hasImageContent,
   normalizeCode,
@@ -108,7 +109,7 @@ export default function ArticleContent({
   const { useThirdPartyMediaPlayer } = useStore(settingsState);
   const { content, inlineUrls } = useMemo(() => {
     const inlineUrls = [];
-    const content = parse(article.content, {
+    const content = parse(sanitizeArticleHtml(article.content), {
       replace: (node) => {
         if (node.name === "audio" || node.name === "video") {
           const media = getArticleMedia(node);
