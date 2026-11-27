@@ -37,6 +37,10 @@ test("tokenize keeps non-latin words", () => {
   assert.deepEqual(tokenize("数据库 迁移"), ["数据", "迁移"]);
 });
 
+test("tokenize keeps combining marks", () => {
+  assert.deepEqual(tokenize("डेटाबेस माइग्रेशन"), ["डेटाबेस", "माइग्रेशन"]);
+});
+
 test("tokenize segments CJK titles written without spaces", () => {
   const tokens = tokenize("苹果发布新款手机数据库迁移方案");
 
@@ -98,6 +102,17 @@ test("buildSignals keeps single-star topics when there is only one star", () => 
   assert.equal(signals.topicCounts.has("sqlite"), true);
 });
 
+test("buildSignals counts a repeated word once per starred title", () => {
+  const signals = buildSignals({
+    articles: [
+      article({ id: 1, starred: 1, title: "SQLite SQLite tuning" }),
+      article({ id: 2, starred: 1, title: "Other news" }),
+    ],
+  });
+
+  assert.equal(signals.topicCounts.has("sqlite"), false);
+});
+
 test("buildSignals reports no signal for a fresh install", () => {
   const signals = buildSignals({ articles: [article({})] });
   assert.equal(signals.starredCount, 0);
@@ -154,14 +169,24 @@ test("rankForYou falls back to recency when no unread article matches", () => {
   const ranked = rankForYou({
     signals,
     articles: [
-      article({ id: 30, feedId: 12, title: "Gardening in July" }),
-      article({ id: 31, feedId: 12, title: "Bread baking" }),
+      article({
+        id: 30,
+        feedId: 12,
+        title: "Gardening in July",
+        published_at: "2024-06-01T00:00:00Z",
+      }),
+      article({
+        id: 31,
+        feedId: 12,
+        title: "Bread baking",
+        published_at: "2024-01-01T00:00:00Z",
+      }),
     ],
   });
 
   assert.deepEqual(
     ranked.map((item) => item.article.id),
-    [31, 30],
+    [30, 31],
   );
 });
 
@@ -212,14 +237,15 @@ test("rankForYou falls back to recency when there is no signal", () => {
   const ranked = rankForYou({
     signals,
     articles: [
-      article({ id: 40, title: "Older", published_at: "2024-01-01T00:00:00Z" }),
-      article({ id: 41, title: "Newer", published_at: "2024-06-01T00:00:00Z" }),
+      // Ids run against the dates, so only publishedAt can produce this order.
+      article({ id: 45, title: "Older", published_at: "2024-01-01T00:00:00Z" }),
+      article({ id: 44, title: "Newer", published_at: "2024-06-01T00:00:00Z" }),
     ],
   });
 
   assert.deepEqual(
     ranked.map((item) => item.article.id),
-    [41, 40],
+    [44, 45],
   );
 });
 

@@ -34,7 +34,9 @@ const segmentChunk = (chunk) => {
 
 // Scoring weights. A topic hit is worth more than a feed hit because it
 // comes from what the reader explicitly starred, not from passive reading.
-const TOPIC_WEIGHT = 1.5;
+// TOPIC_WEIGHT is doubled per topic count, so the smallest real topic (seen in
+// two starred titles) scores 4 and beats the best possible feed score (3.5).
+const TOPIC_WEIGHT = 2;
 const FEED_WEIGHT = 3;
 const FEED_BONUS = 0.5;
 const MAX_REASONS = 3;
@@ -50,10 +52,12 @@ export const toMs = (value) => {
 };
 
 // Unicode-aware: an ASCII-only strip erases CJK and other non-Latin titles.
+// Combining marks (\p{M}) stay attached so scripts like Devanagari, Bengali
+// and Thai keep their vowel signs instead of collapsing to bare consonants.
 export const tokenize = (text) =>
   (text || "")
     .toLowerCase()
-    .replace(/[^\p{L}\p{N}\s]/gu, " ")
+    .replace(/[^\p{L}\p{N}\p{M}\s]/gu, " ")
     .split(/\s+/)
     .flatMap((chunk) => segmentChunk(chunk))
     .filter((word) => word.length > 0 && !STOP_WORDS.has(word))
@@ -83,7 +87,9 @@ export function buildSignals({ articles = [] } = {}) {
     }
     if (article.starred === 1) {
       starredCount += 1;
-      for (const word of tokenize(article.title)) {
+      // One long title can repeat a word; counting titles instead of
+      // occurrences keeps a single star from manufacturing a topic.
+      for (const word of new Set(tokenize(article.title))) {
         topicCounts.set(word, (topicCounts.get(word) || 0) + 1);
       }
     }
@@ -127,9 +133,10 @@ export function rankForYou({ articles = [], signals, limit = 50 } = {}) {
   for (const article of articles) {
     if (article.status !== "unread" || article.starred === 1) continue;
 
-    const hits = tokenize(article.title).filter((word) =>
-      topicCounts.has(word),
-    );
+    const hits = [];
+    for (const word of new Set(tokenize(article.title))) {
+      if (topicCounts.has(word)) hits.push(word);
+    }
     const topicScore =
       hits.reduce((sum, word) => sum + topicCounts.get(word), 0) * TOPIC_WEIGHT;
 
@@ -142,10 +149,13 @@ export function rankForYou({ articles = [], signals, limit = 50 } = {}) {
     const score = topicScore + feedScore;
 
     const reasons = [];
-    if (hits.length) {
-      const top = [...new Set(hits)]
+    // The feed reason takes one of the slots, so a matching article never
+    // carries more than MAX_REASONS labels.
+    const topicSlots = feedScore > 0 ? MAX_REASONS - 1 : MAX_REASONS;
+    if (hits.length && topicSlots > 0) {
+      const top = [...hits]
         .sort((a, b) => topicCounts.get(b) - topicCounts.get(a))
-        .slice(0, MAX_REASONS);
+        .slice(0, topicSlots);
       for (const term of top) reasons.push({ type: "topic", term });
     }
     if (feedScore > 0) reasons.push({ type: "feed", feedId: article.feedId });
