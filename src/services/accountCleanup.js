@@ -1,4 +1,5 @@
 import { accountStorageKey } from "../domain/auth/accounts.js";
+import { clearBackupConfig } from "./githubBackupConfig.js";
 
 export const LOGOUT_NOTICE_KEY = "nextflux:logoutCleanupWarning";
 
@@ -41,9 +42,12 @@ export async function cleanupAccountData(account) {
     "syncHistoryComplete:v1",
     "categoryExpanded",
     "pendingNewArticleNotice",
+    "githubBackup:v1",
   ]) {
     remove(accountStorageKey(account, key));
   }
+  // The stored GitHub token is a secret, so it must not survive the account.
+  clearBackupConfig(account);
   try {
     const prefix = accountStorageKey(account, "mediaProgress:v1:");
     for (const key of Object.keys(localStorage)) {
