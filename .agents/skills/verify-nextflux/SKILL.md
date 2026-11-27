@@ -9,7 +9,7 @@ Nextflux is a React + Vite PWA that reads a Miniflux server. Verify a change by 
 real app, not by reading the diff. There are two tiers: a credential-free gate that always
 runs, and an authenticated browser pass that needs a Miniflux account.
 
-## Tier 1 — credential-free gate (always run, show the output)
+## Tier 1 - credential-free gate (always run, show the output)
 
 ```bash
 npm ci
@@ -25,7 +25,7 @@ Also confirm the service worker was emitted: `ls dist/sw.js`. The PWA uses `inje
 with `src/sw.js` as the source, so a broken `src/sw.js` fails the build rather than shipping
 silently.
 
-## Tier 2 — authenticated browser pass (needs a Miniflux account)
+## Tier 2 - authenticated browser pass (needs a Miniflux account)
 
 The app has no environment-variable config. `import.meta.env` is not used anywhere in `src/`;
 the server URL and credentials are typed into the login form and kept in `localStorage` under
@@ -53,28 +53,39 @@ The machine's `google-chrome` shim is broken, so pass `executable_path` explicit
 letting Playwright pick a default; set `CHROME_PATH` when the cached build differs. Launch with
 `--no-sandbox` and a 1440x900 viewport.
 
+Force the `en-US` locale before driving: the UI text is localized (`react-i18next` with
+`i18next-browser-languagedetector`), and every label below is the English string. Add an init
+script so it applies on every navigation:
+
+```python
+page.add_init_script("try { localStorage.setItem('i18nextLng', 'en-US') } catch (e) {}")
+```
+
 Login flow (`src/pages/LoginPage.jsx`):
 
 1. Go to `/login`.
 2. Fill `#serverUrl` with the Miniflux server URL.
-3. Click the "Token Auth" button — it is a full-width secondary button below the form
-   (`t("auth.tokenAuth")`), not a tab. The form then swaps to the token field.
-4. Fill `#token`, then submit with "Login" (`t("common.login")`).
+3. Pick the auth type that matches the credentials:
+   - **Basic auth (username + password)**: this is the default form - do nothing. Fill
+     `#username` and `#password`, then submit.
+   - **API token**: click the "Token Auth" button first - it is a full-width secondary button
+     below the form (`t("auth.tokenAuth")`), not a tab. The form then swaps to `#token`; fill it.
+4. Submit with "Login" (`t("common.login")`).
 5. Wait for the feed list, then open the account menu by clicking the element whose text is
    the server URL (the exact host depends on the account).
 6. Click the "Settings" menu item.
 
 ## What to check per change
 
-Settings tabs are defined in `src/components/Settings/Settings.jsx` — `general`, `appearance`,
+Settings tabs are defined in `src/components/Settings/Settings.jsx` - `general`, `appearance`,
 `readability`, `ai`, `backup` (labelled "Data", `settings.backup.title`), `shortcuts`, `about`.
 Open Settings, select the tab, screenshot the panel, and state what you saw.
 
 - **Data tab** (`src/components/Settings/Backup.jsx`): subscription backup and settings backup.
-  At `main` there is no GitHub backup card — that lives on the `feat/github-backup` branch. Do
+  At `main` there is no GitHub backup card - that lives on the `feat/github-backup` branch. Do
   not report its absence as a failure when verifying a branch that does not carry it.
 - **Service worker / push**: confirm `dist/sw.js` exists after build. If the diff adds push or
-  notification code, check that nothing awaits `navigator.serviceWorker.ready` unconditionally —
+  notification code, check that nothing awaits `navigator.serviceWorker.ready` unconditionally  - 
   it never settles when no worker is registered, so the call must check `getRegistration()`
   first and return early.
 - **Backend `functions/`**: only exists on the web-push branches, not at `main`. When verifying
@@ -96,4 +107,4 @@ its field wrapper; horizontal checkbox rows use `Field orientation="horizontal"`
 
 Save screenshots to a temp directory (for example `/tmp/verify-<change>/`) and report the
 paths. Report what you observed, including what you could not check. If the authenticated
-pass was skipped for lack of credentials, say so explicitly — do not imply it ran.
+pass was skipped for lack of credentials, say so explicitly - do not imply it ran.
