@@ -249,7 +249,7 @@ test("rankForYou falls back to recency when there is no signal", () => {
   );
 });
 
-test("rankForYou respects the limit and requires signals", () => {
+test("rankForYou respects the limit", () => {
   const signals = buildSignals({
     articles: [article({ id: 1, starred: 1, title: "SQLite WAL mode" })],
   });
@@ -265,4 +265,11 @@ test("rankForYou respects the limit and requires signals", () => {
 
   assert.equal(ranked.length, 1);
   assert.equal(ranked[0].article.id, 51);
+});
+
+test("rankForYou returns nothing without signals", () => {
+  assert.deepEqual(
+    rankForYou({ articles: [article({ id: 60 })] }),
+    [],
+  );
 });
