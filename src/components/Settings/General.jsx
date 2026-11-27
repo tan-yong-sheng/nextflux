@@ -1,5 +1,5 @@
 import { Separator } from "@/components/ui/separator";
-import { settingsState } from "@/stores/settingsStore";
+import { settingsState, updateSettings } from "@/stores/settingsStore";
 import {
   CircleCheck,
   CircleDot,
@@ -9,6 +9,7 @@ import {
   FolderOpen,
   RefreshCw,
   CalendarDays,
+  BellRing,
 } from "lucide-react";
 import { useStore } from "@nanostores/react";
 import {
@@ -19,6 +20,12 @@ import {
 import Language from "@/components/Settings/components/Language.jsx";
 import { useTranslation } from "react-i18next";
 import SettingIcon from "@/components/ui/SettingIcon";
+import {
+  notificationPermission,
+  requestNotificationPermission,
+  supportsNotifications,
+} from "@/services/notificationService";
+import { toast } from "sonner";
 export default function General() {
   const {
     sortDirection,
@@ -28,8 +35,26 @@ export default function General() {
     syncInterval,
     defaultExpandCategory,
     showUnreadByDefault,
+    notifyNewArticles,
   } = useStore(settingsState);
   const { t } = useTranslation();
+  const toggleNotifications = async (checked) => {
+    if (!checked) {
+      updateSettings({ notifyNewArticles: false });
+      return;
+    }
+    if (!supportsNotifications()) {
+      toast.error(t("settings.general.notifyUnsupported"));
+      return;
+    }
+    const permission = await requestNotificationPermission();
+    if (permission === "denied") {
+      toast.error(t("settings.general.notifyDenied"));
+      return;
+    }
+    if (permission !== "granted") return;
+    updateSettings({ notifyNewArticles: true });
+  };
   return (
     <>
       <Language />
@@ -65,6 +90,20 @@ export default function General() {
               label: t("settings.general.sync1hour"),
             },
           ]}
+        />
+        <SwitchItem
+          label={t("settings.general.notifyNewArticles")}
+          description={t("settings.general.notifyNewArticlesDescription")}
+          icon={
+            <SettingIcon variant="default">
+              <BellRing />
+            </SettingIcon>
+          }
+          settingName="notifyNewArticles"
+          settingValue={
+            notifyNewArticles && notificationPermission() === "granted"
+          }
+          onChange={toggleNotifications}
         />
       </ItemWrapper>
       <ItemWrapper title={t("settings.general.feeds")}>

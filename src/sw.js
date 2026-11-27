@@ -7,6 +7,22 @@ self.addEventListener("message", (event) => {
   if (event.data?.type === "SKIP_WAITING") self.skipWaiting();
 });
 
+// Tapping a notification focuses an existing tab or opens the app.
+self.addEventListener("notificationclick", (event) => {
+  event.notification?.close?.();
+  const url = event.notification?.data?.url || "/";
+  event.waitUntil(
+    self.clients
+      .matchAll({ type: "window", includeUncontrolled: true })
+      .then((clients) => {
+        const existing = clients.find((client) =>
+          client.url.startsWith(self.registration.scope),
+        );
+        return existing ? existing.focus() : self.clients.openWindow(url);
+      }),
+  );
+});
+
 self.addEventListener("activate", (event) => {
   // Remove the offline shell created by earlier Nextflux releases. Limit the
   // cleanup to Workbox precaches belonging to this worker's exact scope.

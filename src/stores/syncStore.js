@@ -1,10 +1,24 @@
 import { atom } from "nanostores";
-import { getLastSyncTime, isHistorySyncComplete } from "@/db/storage.js";
+import { persistentAtom } from "@nanostores/persistent";
+import {
+  getLastSyncTime,
+  isHistorySyncComplete,
+} from "@/db/storage.js";
 import { reportError } from "@/lib/errors.js";
 import { syncService } from "@/services/syncService.js";
 import { settingsState } from "@/stores/settingsStore.js";
+import { feeds, loadFeeds } from "@/stores/feedsStore.js";
+import {
+  collectNewArticleNotice,
+  notificationRunEnabled,
+} from "@/domain/notifications/newArticleNotice.js";
+import {
+  notificationPermission,
+  showNewArticles,
+} from "@/services/notificationService.js";
 
 import { sessionAccount } from "@/stores/authStore.js";
+import { accountStorageKey } from "@/domain/auth/accounts.js";
 
 export const isOnline = atom(navigator.onLine);
 export const isSyncing = atom(false);
@@ -19,6 +33,48 @@ let running = false;
 let failures = 0;
 let retryAfter = 0;
 
+// Articles added by a sync run that failed before the notice was shown. Their
+// rows are already committed, so a retry would not report them as added again;
+// persisting them lets the next successful run still announce them.
+const pendingNoticeArticles = persistentAtom(
+  accountStorageKey(sessionAccount, "pendingNewArticleNotice"),
+  [],
+  {
+    encode: (value) => JSON.stringify(value),
+    decode: (str) => {
+      try {
+        const parsed = JSON.parse(str);
+        if (!Array.isArray(parsed)) return [];
+        // mergeNoticeCandidates destructures every pending item, so drop
+        // anything a corrupted write may have left behind.
+        return parsed.filter(
+          (item) => item && typeof item === "object" && item.id !== undefined && item.id !== null,
+        );
+      } catch {
+        return [];
+      }
+    },
+  },
+);
+
+function mergeNoticeCandidates(pending, added) {
+  const seen = new Set(pending.map(({ id }) => id));
+  const next = [...pending];
+  for (const article of added) {
+    if (seen.has(article.id)) continue;
+    seen.add(article.id);
+    next.push({
+      id: article.id,
+      title: article.title,
+      feedId: article.feedId,
+      status: article.status,
+    });
+  }
+  // Keep every candidate: the notice count has to reflect what actually
+  // arrived, and the queue is emptied once the notice is shown.
+  return next;
+}
+
 export function sync() {
   if (inFlight) return inFlight;
   if (!isOnline.get()) return Promise.resolve();
@@ -27,21 +83,56 @@ export function sync() {
   isSyncing.set(true);
   error.set(null);
   syncProgress.set({ phase: "loading", received: 0 });
+  const settings = settingsState.get();
+  const runAllowsNotice = notificationRunEnabled({
+    enabled: settings.notifyNewArticles,
+    permission: notificationPermission(),
+    hadPreviousSync: Boolean(getLastSyncTime()),
+    historyComplete: isHistorySyncComplete(),
+  });
+  const newArticles = [];
   const synchronize = async () => {
     signal.throwIfAborted();
     const result = await syncService.synchronize({
       signal,
-      onBatch: ({ articles }) => {
+      onBatch: ({ articles, added }) => {
         const progress = syncProgress.get();
         syncProgress.set({
           phase: "background",
           received: progress.received + articles.length,
         });
+        if (runAllowsNotice && added?.length) newArticles.push(...added);
       },
     });
     lastSync.set(result);
     failures = 0;
     retryAfter = 0;
+    if (runAllowsNotice) {
+      const candidates = mergeNoticeCandidates(
+        pendingNoticeArticles.get(),
+        newArticles,
+      );
+      if (candidates.length) {
+        // This sync may have changed feed visibility; refresh before deciding.
+        // A failed refresh leaves the queue intact for the next run.
+        if (!(await loadFeeds())) return result;
+        const notice = collectNewArticleNotice(
+          candidates,
+          feeds.get(),
+          settingsState.get().showHiddenFeeds,
+        );
+        if (!notice) {
+          pendingNoticeArticles.set([]);
+          return result;
+        }
+        try {
+          await showNewArticles(notice);
+          pendingNoticeArticles.set([]);
+        } catch (noticeError) {
+          reportError(noticeError, "notification.show");
+        }
+      }
+    }
     return result;
   };
   // Serialize browser tabs sharing the same IndexedDB and synchronization watermark.
@@ -56,6 +147,11 @@ export function sync() {
   )
     .catch((syncError) => {
       if (signal.aborted) return;
+      if (runAllowsNotice && newArticles.length) {
+        pendingNoticeArticles.set(
+          mergeNoticeCandidates(pendingNoticeArticles.get(), newArticles),
+        );
+      }
       failures += 1;
       retryAfter =
         Date.now() + Math.min(30 * 60_000, 30_000 * 2 ** (failures - 1));

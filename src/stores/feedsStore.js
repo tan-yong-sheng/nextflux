@@ -151,7 +151,7 @@ export async function loadFeeds() {
       getCategories(),
       getFeedCounts(),
     ]);
-    if (version !== loadVersion) return;
+    if (version !== loadVersion) return false;
     feeds.set(reconcileRecords(feeds.get(), storedFeeds));
     categories.set(reconcileRecords(categories.get(), storedCategories));
     const visibleIds = new Set(
@@ -169,7 +169,9 @@ export async function loadFeeds() {
     const starred = visibleCounts(counts.starred);
     if (!sameRecord(unreadCounts.get(), unread)) unreadCounts.set(unread);
     if (!sameRecord(starredCounts.get(), starred)) starredCounts.set(starred);
+    return true;
   } catch (err) {
     error.set(reportError(err, "feeds.load", "加载订阅源失败"));
+    return false;
   }
 }

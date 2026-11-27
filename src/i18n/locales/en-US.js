@@ -309,6 +309,12 @@ export default {
       sync15min: "Every 15 minutes",
       sync30min: "Every 30 minutes",
       sync1hour: "Every hour",
+      notifyNewArticles: "New article notifications",
+      notifyNewArticlesDescription:
+        "Notify while Nextflux is open. Closed-app push is not supported yet.",
+      notifyDenied:
+        "Notification permission was denied. Allow notifications for Nextflux in your browser or system settings.",
+      notifyUnsupported: "This browser does not support notifications.",
       feeds: "FEEDS",
       showHiddenFeeds: "Show hidden feeds",
       defaultExpandCategory: "Expand categories by default",
@@ -406,6 +412,10 @@ export default {
       selectModel: "Select model",
       prompt: "Prompt",
     },
+  },
+  notifications: {
+    newArticles_one: "{{count}} new article",
+    newArticles_other: "{{count}} new articles",
   },
   error: {
     description404: "Page not found",
