@@ -2,7 +2,7 @@ import { sessionAccount } from "@/stores/authStore";
 import { reportError } from "@/lib/errors.js";
 import { decodeBase64Url } from "@/domain/push/vapidKey.js";
 import { hiddenFeedIds as hiddenFeedIdList } from "@/domain/notifications/hiddenFeeds.js";
-import { feeds } from "@/stores/feedsStore.js";
+import { feeds, loadFeeds } from "@/stores/feedsStore.js";
 import { settingsState } from "@/stores/settingsStore.js";
 
 const VAPID_PATH = "/api/push/vapid-public-key";
@@ -41,8 +41,11 @@ function authHeaders(account = sessionAccount) {
 
 // The feeds this device hides. The server builds the pushed notice and does
 // not know the visibility of the device, so the ids travel with the
-// subscription.
-function hiddenFeedIds() {
+// subscription. The store hydrates asynchronously after startup, so wait for
+// the first load: registering before it would report no hidden feeds and a
+// webhook could then push a feed the reader hid.
+async function hiddenFeedIds() {
+  if (feeds.get().length === 0) await loadFeeds();
   return hiddenFeedIdList(
     feeds.get(),
     settingsState.get().showHiddenFeeds,
@@ -147,7 +150,7 @@ export async function subscribeToPush() {
     ...subscription.toJSON(),
     // The webhook payload does not say which feeds the reader hides, so the
     // device reports them and the server leaves those entries out.
-    hiddenFeedIds: hiddenFeedIds(),
+    hiddenFeedIds: await hiddenFeedIds(),
   });
   activeSubscription = subscription;
   return "subscribed";
@@ -164,7 +167,7 @@ export async function syncPushHiddenFeeds() {
   try {
     await postJson(SUBSCRIBE_PATH, {
       ...subscription.toJSON(),
-      hiddenFeedIds: hiddenFeedIds(),
+      hiddenFeedIds: await hiddenFeedIds(),
     });
     return "subscribed";
   } catch (error) {
